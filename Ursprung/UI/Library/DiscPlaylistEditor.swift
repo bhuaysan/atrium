@@ -102,7 +102,7 @@ struct DiscPlaylistEditor: View {
         }
         .frame(width: 600, height: 480)
         .onAppear(perform: load)
-        .alert("The playlist couldn't be saved", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+        .alert("The playlist couldn't be saved", isPresented: $error.isPresent()) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(error ?? "")

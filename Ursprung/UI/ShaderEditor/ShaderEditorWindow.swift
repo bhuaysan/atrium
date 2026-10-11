@@ -60,7 +60,7 @@ struct ShaderEditorWindow: View {
             Text("Saves the shader to My Shaders, where every Filter menu offers it.")
         }
         .confirmationDialog(Text("Replace “\(replacedName ?? "")”?"),
-                            isPresented: Binding(get: { replacedName != nil }, set: { if !$0 { replacedName = nil } })) {
+                            isPresented: $replacedName.isPresent()) {
             Button("Replace", role: .destructive) { save(as: presetName, replacing: true) }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -81,7 +81,7 @@ struct ShaderEditorWindow: View {
             Text("All changes since the shader was opened or saved are lost.")
         }
         .alert("The shader couldn’t be saved",
-               isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+               isPresented: $failure.isPresent()) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(verbatim: failure ?? "")

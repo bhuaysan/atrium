@@ -340,7 +340,7 @@ private struct TextureInspector: View {
                 if case .success(let url) = result { editor.addTexture(url) }
             }
         }
-        .fileImporter(isPresented: Binding(get: { replacedTexture != nil }, set: { if !$0 { replacedTexture = nil } }),
+        .fileImporter(isPresented: $replacedTexture.isPresent(),
                       allowedContentTypes: [.png, .jpeg, .image]) { result in
             if case .success(let url) = result, let id = replacedTexture {
                 editor.updateTexture(id) { $0.path = url.path(percentEncoded: false) }

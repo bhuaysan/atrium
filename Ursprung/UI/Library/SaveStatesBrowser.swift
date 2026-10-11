@@ -90,7 +90,7 @@ struct SaveStatesBrowser: View {
         .onAppear(perform: reload)
         // A save through the running emulator lands while the sheet is open.
         .onChange(of: session.slots) { reload() }
-        .alert("Name Save State", isPresented: Binding(get: { stateToRename != nil }, set: { if !$0 { stateToRename = nil } }),
+        .alert("Name Save State", isPresented: $stateToRename.isPresent(),
                presenting: stateToRename) { state in
             TextField("Name", text: $newName)
             Button("Save") {
@@ -104,7 +104,7 @@ struct SaveStatesBrowser: View {
             Text("A name for the state in \(state.slotTitle).")
         }
         .confirmationDialog(stateToDelete?.isHistory == true ? Text("Delete this replaced state?") : Text("Delete this save state?"),
-                            isPresented: Binding(get: { stateToDelete != nil }, set: { if !$0 { stateToDelete = nil } }),
+                            isPresented: $stateToDelete.isPresent(),
                             presenting: stateToDelete) { state in
             Button("Delete", role: .destructive) {
                 do {
@@ -119,7 +119,7 @@ struct SaveStatesBrowser: View {
             Text(state.isHistory || state.isAutosave || state.isLegacy ? "This can't be undone."
                                                                         : "You can restore it from Recently Replaced.")
         }
-        .alert(failure?.title ?? "", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } }),
+        .alert(failure?.title ?? "", isPresented: $failure.isPresent(),
                presenting: failure) { _ in
             Button("OK", role: .cancel) {}
         } message: { failure in

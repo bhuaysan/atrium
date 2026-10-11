@@ -96,14 +96,14 @@ struct ShaderPanel: View {
             Text("Saves the preset with your changes to My Shaders and uses it for \(scopeTitle).")
         }
         .confirmationDialog(Text("Replace “\(replacedName ?? "")”?"),
-                            isPresented: Binding(get: { replacedName != nil }, set: { if !$0 { replacedName = nil } })) {
+                            isPresented: $replacedName.isPresent()) {
             Button("Replace", role: .destructive) { save(replacing: true) }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("My Shaders already has a preset with this name.")
         }
         .alert("The preset couldn't be saved",
-               isPresented: Binding(get: { saveFailure != nil }, set: { if !$0 { saveFailure = nil } })) {
+               isPresented: $saveFailure.isPresent()) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(verbatim: saveFailure ?? "")

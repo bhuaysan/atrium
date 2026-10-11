@@ -93,7 +93,7 @@ struct CoresSettingsView: View {
         .formStyle(.grouped)
         .confirmationDialog(
             Text("Remove “\(coreToRemove?.name ?? "")”?"),
-            isPresented: Binding(get: { coreToRemove != nil }, set: { if !$0 { coreToRemove = nil } }),
+            isPresented: $coreToRemove.isPresent(),
             presenting: coreToRemove
         ) { core in
             if let emulator = core.standalone {

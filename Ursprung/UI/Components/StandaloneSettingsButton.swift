@@ -28,7 +28,7 @@ struct StandaloneSettingsButton: View {
               ? String(localized: "Available when no game is running in \(emulator.name)")
               : String(localized: "Opens \(emulator.name)'s window; its settings are in its Settings menu"))
         .alert(Text("\(emulator.name) couldn't be opened"),
-               isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+               isPresented: $failure.isPresent()) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(failure ?? "")
