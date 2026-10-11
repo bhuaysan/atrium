@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Ursprung is now called Atrium. On its first launch Atrium takes over
+  Ursprung's library, saves, settings and keychain items; backups made by
+  Ursprung can still be restored. A games folder created by Ursprung
+  (`~/Ursprung`) stays where it is.
+
 ### Added
 - Vulkan for libretro cores through MoltenVK (embedded): Mupen64Plus-Next
   renders N64 games with paraLLEl-RDP (accurate, on the GPU, optional
@@ -48,7 +54,7 @@ First public development version.
 - Game controller support (up to four players) and remappable keyboard.
 - BIOS manager with checksum verification and automatic renaming on import.
 - English and German localization.
-- Headless `ursprung-smoke` tool and unit tests.
+- Headless `atrium-smoke` tool and unit tests.
 
 ### Known issues
 - GLideN64's frame buffer emulation renders black on Apple's OpenGL; the N64

@@ -1,0 +1,1576 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#import "URLibretroCore+Internal.h"
+
+#import "URGLContext.h"
+#import "URLibretroCore+Testing.h"
+#import "URVulkanContext.h"
+#import "libretro.h"
+#import "libretro_vulkan.h"
+
+#include <dlfcn.h>
+#include <mach/mach_time.h>
+#include <os/lock.h>
+#include <os/log.h>
+#include <stdarg.h>
+#include <stdatomic.h>
+#include <sys/xattr.h>
+
+static NSString *const URCoreErrorDomain = @"Atrium.Core";
+
+static os_log_t URCoreLog(void) {
+    static os_log_t log;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ log = os_log_create("io.github.bhuaysan.Atrium", "core"); });
+    return log;
+}
+
+#pragma mark - Core option model
+
+@implementation URCoreOption
+- (instancetype)initWithKey:(NSString *)key
+                      title:(NSString *)title
+                       info:(nullable NSString *)info
+                   category:(nullable NSString *)category
+                     values:(NSArray<NSString *> *)values
+                     labels:(NSArray<NSString *> *)labels
+               defaultValue:(NSString *)defaultValue {
+    self = [super init];
+    if (self) {
+        _key = [key copy];
+        _title = [title copy];
+        _info = [info copy];
+        _category = [category copy];
+        _values = [values copy];
+        _labels = [labels copy];
+        _defaultValue = [defaultValue copy];
+    }
+    return self;
+}
+@end
+
+#pragma mark - Symbols
+
+typedef struct {
+    void (*init)(void);
+    void (*deinit)(void);
+    unsigned (*api_version)(void);
+    void (*get_system_info)(struct retro_system_info *);
+    void (*get_system_av_info)(struct retro_system_av_info *);
+    void (*set_environment)(retro_environment_t);
+    void (*set_video_refresh)(retro_video_refresh_t);
+    void (*set_audio_sample)(retro_audio_sample_t);
+    void (*set_audio_sample_batch)(retro_audio_sample_batch_t);
+    void (*set_input_poll)(retro_input_poll_t);
+    void (*set_input_state)(retro_input_state_t);
+    void (*set_controller_port_device)(unsigned, unsigned);
+    void (*reset)(void);
+    void (*run)(void);
+    size_t (*serialize_size)(void);
+    bool (*serialize)(void *, size_t);
+    bool (*unserialize)(const void *, size_t);
+    bool (*load_game)(const struct retro_game_info *);
+    void (*unload_game)(void);
+    void *(*get_memory_data)(unsigned);
+    size_t (*get_memory_size)(unsigned);
+    // Optional: cores without cheat support may leave them out.
+    void (*cheat_reset)(void);
+    void (*cheat_set)(unsigned, bool, const char *);
+} URCoreSymbols;
+
+typedef struct {
+    uint8_t *data;
+    size_t capacity;
+    unsigned width;
+    unsigned height;
+} URFrameBuffer;
+
+// Global input state (one active core at a time).
+static _Atomic uint32_t gButtonMasks[UR_MAX_PORTS];
+static _Atomic int16_t gAnalog[UR_MAX_PORTS][2][2];
+static _Atomic int16_t gPointerX, gPointerY;
+static _Atomic bool gPointerPressed;
+static _Atomic uint32_t gTurboMasks[UR_MAX_PORTS];
+/// Whether turbo buttons are in the released half of their rhythm.
+static _Atomic bool gTurboReleased;
+static _Atomic bool gKeys[RETROK_LAST];
+
+/// A key event for the core's keyboard callback, queued until its next frame.
+typedef struct {
+    bool down;
+    unsigned keycode;
+    uint32_t character;
+    uint16_t modifiers;
+} URKeyEvent;
+
+@class URLibretroCore;
+static __unsafe_unretained URLibretroCore *gActiveCore = nil;
+/// A core whose game was unloaded while the GPU still ran one of its frames.
+/// context_destroy, retro_unload_game and retro_deinit could free what that
+/// frame uses, so they wait until it is done; meanwhile the core keeps its
+/// library, its Vulkan context and the callbacks (gActiveCore).
+static URLibretroCore *gUnfinishedCore = nil;
+
+@interface URLibretroCore ()
+- (void)postMessage:(NSString *)message duration:(NSTimeInterval)duration;
+@end
+
+@implementation URLibretroCore {
+@public
+    void *_handle;
+    URCoreSymbols _sym;
+
+    char *_systemDirC;
+    char *_saveDirC;
+    char *_corePathC;
+    char *_gamePathC;
+    char *_usernameC;
+    NSData *_gameData;
+
+    enum retro_pixel_format _pixelFormat;
+    struct retro_system_av_info _avInfo;
+    _Atomic bool _avInfoChanged;
+
+    // Video
+    os_unfair_lock _frameLock;
+    URFrameBuffer _back;
+    URFrameBuffer _ready;
+    BOOL _hasFrame;
+    _Atomic uint64_t _frameSerial;
+
+    // Audio
+    URAudioRing _ring;
+
+    // Hardware rendering
+    struct retro_hw_render_callback _hwRender;
+    URGLContext *_gl;
+    /// The core asked for Vulkan; the context is created after load_game.
+    BOOL _wantsVulkan;
+    const struct retro_hw_render_context_negotiation_interface_vulkan *_vulkanNegotiation;
+    URVulkanContext *_vulkan;
+
+    // Options
+    NSMutableDictionary<NSString *, NSData *> *_optionValues;
+    // Every option value string ever handed to the core, keyed by its text.
+    // Cores may still read a pointer from GET_VARIABLE when the user changes
+    // the option, so these strings live as long as the core.
+    NSMutableDictionary<NSString *, NSData *> *_optionCStrings;
+    NSMutableArray<URCoreOption *> *_optionDefinitions;
+    BOOL _optionsUpdated;
+
+    // Save RAM
+    NSData *_lastSavedRAM;
+    NSData *_lastSavedRTC;
+    BOOL _saveFailing;
+
+    // Run-ahead and rewind switch these off for frames nobody sees or hears.
+    _Atomic bool _videoEnabled;
+    _Atomic bool _audioEnabled;
+
+    // Turbo
+    _Atomic NSInteger _turboPeriod;
+    uint64_t _turboClock;
+
+    // Keyboard
+    struct retro_keyboard_callback _keyboardCallback;
+    BOOL _hasKeyboardCallback;
+    os_unfair_lock _keyLock;
+    URKeyEvent *_keyEvents;
+    size_t _keyEventCount;
+    size_t _keyEventCapacity;
+
+    // Rumble: last strength per port and motor, to report changes only.
+    uint16_t _rumble[UR_MAX_PORTS][2];
+
+    // Memory map (SET_MEMORY_MAPS), copied with its strings.
+    struct retro_memory_map _memoryMap;
+    struct retro_memory_descriptor *_memoryDescriptors;
+    NSUInteger _memoryMapRevision;
+
+    // Misc callbacks
+    struct retro_frame_time_callback _frameTimeCallback;
+    BOOL _hasFrameTimeCallback;
+    struct retro_disk_control_ext_callback _disk;
+    BOOL _hasDiskControl;
+    BOOL _gameLoaded;
+    BOOL _initialized;
+    NSInteger _rotation;
+    BOOL _shutdownRequested;
+}
+
+#pragma mark - Init
+
+- (nullable instancetype)initWithPath:(NSString *)path error:(NSError **)error {
+    self = [super init];
+    if (!self) return nil;
+
+    _path = [path copy];
+    _systemDirectory = NSTemporaryDirectory();
+    _saveDirectory = NSTemporaryDirectory();
+    _optionOverrides = @{};
+    _languageCode = @"en";
+    _frameLock = OS_UNFAIR_LOCK_INIT;
+    _keyLock = OS_UNFAIR_LOCK_INIT;
+    atomic_store(&_videoEnabled, true);
+    atomic_store(&_audioEnabled, true);
+    atomic_store(&_turboPeriod, 3);
+    _optionValues = [NSMutableDictionary dictionary];
+    _optionCStrings = [NSMutableDictionary dictionary];
+    _optionDefinitions = [NSMutableArray array];
+    _pixelFormat = RETRO_PIXEL_FORMAT_0RGB1555;
+
+    // Files downloaded by the app must not carry a quarantine flag, otherwise
+    // dlopen refuses them.
+    removexattr(path.fileSystemRepresentation, "com.apple.quarantine", 0);
+
+    _handle = dlopen(path.fileSystemRepresentation, RTLD_LAZY | RTLD_LOCAL);
+    if (!_handle) {
+        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:1 userInfo:@{
+            NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Could not load core: %s", dlerror()]
+        }];
+        return nil;
+    }
+
+#define UR_LOAD(field, name)                                                                  \
+    _sym.field = dlsym(_handle, name);                                                        \
+    if (!_sym.field) {                                                                        \
+        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:2 userInfo:@{     \
+            NSLocalizedDescriptionKey: @"The core is missing the libretro symbol " @name "."  \
+        }];                                                                                   \
+        dlclose(_handle);                                                                     \
+        _handle = NULL;                                                                       \
+        return nil;                                                                           \
+    }
+    UR_LOAD(init, "retro_init")
+    UR_LOAD(deinit, "retro_deinit")
+    UR_LOAD(api_version, "retro_api_version")
+    UR_LOAD(get_system_info, "retro_get_system_info")
+    UR_LOAD(get_system_av_info, "retro_get_system_av_info")
+    UR_LOAD(set_environment, "retro_set_environment")
+    UR_LOAD(set_video_refresh, "retro_set_video_refresh")
+    UR_LOAD(set_audio_sample, "retro_set_audio_sample")
+    UR_LOAD(set_audio_sample_batch, "retro_set_audio_sample_batch")
+    UR_LOAD(set_input_poll, "retro_set_input_poll")
+    UR_LOAD(set_input_state, "retro_set_input_state")
+    UR_LOAD(set_controller_port_device, "retro_set_controller_port_device")
+    UR_LOAD(reset, "retro_reset")
+    UR_LOAD(run, "retro_run")
+    UR_LOAD(serialize_size, "retro_serialize_size")
+    UR_LOAD(serialize, "retro_serialize")
+    UR_LOAD(unserialize, "retro_unserialize")
+    UR_LOAD(load_game, "retro_load_game")
+    UR_LOAD(unload_game, "retro_unload_game")
+    UR_LOAD(get_memory_data, "retro_get_memory_data")
+    UR_LOAD(get_memory_size, "retro_get_memory_size")
+#undef UR_LOAD
+    _sym.cheat_reset = dlsym(_handle, "retro_cheat_reset");
+    _sym.cheat_set = dlsym(_handle, "retro_cheat_set");
+
+    if (_sym.api_version() != RETRO_API_VERSION) {
+        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:3 userInfo:@{
+            NSLocalizedDescriptionKey: @"The core uses an incompatible libretro API version."
+        }];
+        dlclose(_handle);
+        _handle = NULL;
+        return nil;
+    }
+
+    struct retro_system_info info = {0};
+    _sym.get_system_info(&info);
+    _libraryName = info.library_name ? @(info.library_name) : path.lastPathComponent;
+    _libraryVersion = info.library_version ? @(info.library_version) : @"";
+    _needsFullPath = info.need_fullpath;
+    _blockExtract = info.block_extract;
+    NSString *extensions = info.valid_extensions ? @(info.valid_extensions) : @"";
+    NSMutableArray *list = [NSMutableArray array];
+    for (NSString *ext in [extensions componentsSeparatedByString:@"|"]) {
+        if (ext.length) [list addObject:ext.lowercaseString];
+    }
+    _validExtensions = list;
+    return self;
+}
+
+- (void)dealloc {
+    if (_gameLoaded) [self unloadGame];
+    if (_handle) dlclose(_handle);
+    free(_systemDirC);
+    free(_saveDirC);
+    free(_corePathC);
+    free(_gamePathC);
+    free(_usernameC);
+    free(_back.data);
+    free(_ready.data);
+    free(_keyEvents);
+    [self clearMemoryMap];
+    URAudioRingFree(&_ring);
+}
+
+- (URAudioRing *)audioRing { return &_ring; }
+
+#pragma mark - Lifecycle
+
+- (BOOL)loadGameAtPath:(NSString *)path error:(NSError **)error {
+    if (![self becomeActiveCoreWithError:error]) return NO;
+    [self resetFrontendStateForGameAtPath:path];
+    [self initializeCore];
+
+    struct retro_game_info game = {0};
+    game.path = _gamePathC;
+    if (!_needsFullPath) {
+        _gameData = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:error];
+        if (!_gameData) {
+            [self teardownAfterFailedLoad];
+            return NO;
+        }
+        game.data = _gameData.bytes;
+        game.size = _gameData.length;
+    }
+
+    if (!_sym.load_game(&game)) {
+        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:5 userInfo:@{
+            NSLocalizedDescriptionKey: @"The core could not load this game. The file may be damaged, unsupported, or a required BIOS file is missing."
+        }];
+        [self teardownAfterFailedLoad];
+        return NO;
+    }
+    _gameLoaded = YES;
+
+    _sym.get_system_av_info(&_avInfo);
+    [self sanitizeAVInfo];
+    URAudioRingFree(&_ring);
+    URAudioRingInit(&_ring, (size_t)MAX(_avInfo.timing.sample_rate, 8000.0) / 2); // 500 ms
+    for (unsigned port = 0; port < URMaxPorts; port++) {
+        _sym.set_controller_port_device(port, RETRO_DEVICE_JOYPAD);
+    }
+
+    if (![self startHardwareRenderingWithError:error]) {
+        // Not -unloadGame: save RAM is not loaded yet and must not be written.
+        _sym.unload_game();
+        _gameLoaded = NO;
+        [self teardownAfterFailedLoad];
+        return NO;
+    }
+
+    [self loadSaveRAM];
+    return YES;
+}
+
+/// Only one core runs at a time: its callbacks are global C functions. A
+/// previous core whose GPU work had not finished is unloaded first.
+- (BOOL)becomeActiveCoreWithError:(NSError **)error {
+    URLibretroCore *unfinished = gUnfinishedCore;
+    if (unfinished && ![unfinished finishUnloading]) {
+        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:7 userInfo:@{
+            NSLocalizedDescriptionKey: @"The graphics card is still busy with the previous game. Quit and reopen Atrium to play again."
+        }];
+        return NO;
+    }
+    if (gActiveCore && gActiveCore != self) {
+        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:4 userInfo:@{
+            NSLocalizedDescriptionKey: @"Another game is already running."
+        }];
+        return NO;
+    }
+    gActiveCore = self;
+    return YES;
+}
+
+/// The paths the core asks for, released input and no hardware rendering
+/// until the core requests it.
+- (void)resetFrontendStateForGameAtPath:(NSString *)path {
+    free(_systemDirC); _systemDirC = strdup(self.systemDirectory.fileSystemRepresentation);
+    free(_saveDirC); _saveDirC = strdup(self.saveDirectory.fileSystemRepresentation);
+    free(_corePathC); _corePathC = strdup(self.path.fileSystemRepresentation);
+    free(_gamePathC); _gamePathC = strdup(path.fileSystemRepresentation);
+    free(_usernameC); _usernameC = strdup(NSUserName().UTF8String ?: "Player");
+
+    for (NSInteger port = 0; port < URMaxPorts; port++) {
+        atomic_store(&gButtonMasks[port], 0);
+        atomic_store(&gTurboMasks[port], 0);
+        for (int s = 0; s < 2; s++) {
+            atomic_store(&gAnalog[port][s][0], 0);
+            atomic_store(&gAnalog[port][s][1], 0);
+        }
+    }
+    for (unsigned key = 0; key < RETROK_LAST; key++) atomic_store(&gKeys[key], false);
+    atomic_store(&gTurboReleased, false);
+    memset(&_hwRender, 0, sizeof(_hwRender));
+    _wantsVulkan = NO;
+    _vulkanNegotiation = NULL;
+}
+
+/// Hands the core the frontend's callbacks and initializes it.
+- (void)initializeCore {
+    extern bool URCoreEnvironment(unsigned cmd, void *data);
+    extern void URCoreVideoRefresh(const void *data, unsigned width, unsigned height, size_t pitch);
+    extern void URCoreAudioSample(int16_t left, int16_t right);
+    extern size_t URCoreAudioSampleBatch(const int16_t *data, size_t frames);
+    extern void URCoreInputPoll(void);
+    extern int16_t URCoreInputState(unsigned port, unsigned device, unsigned index, unsigned id);
+
+    _sym.set_environment(URCoreEnvironment);
+    _sym.init();
+    _initialized = YES;
+    _sym.set_video_refresh(URCoreVideoRefresh);
+    _sym.set_audio_sample(URCoreAudioSample);
+    _sym.set_audio_sample_batch(URCoreAudioSampleBatch);
+    _sym.set_input_poll(URCoreInputPoll);
+    _sym.set_input_state(URCoreInputState);
+}
+
+/// Sets up the OpenGL or Vulkan context the core asked for while loading
+/// the game, and lets the core create its resources in it.
+- (BOOL)startHardwareRenderingWithError:(NSError **)error {
+    if (_gl) {
+        [_gl makeCurrent];
+        [_gl resizeFramebufferWidth:_avInfo.geometry.max_width height:_avInfo.geometry.max_height];
+    } else if (_wantsVulkan) {
+        NSError *vulkanError = nil;
+        _vulkan = [[URVulkanContext alloc] initWithNegotiation:_vulkanNegotiation error:&vulkanError];
+        if (!_vulkan) {
+            if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:6 userInfo:@{
+                NSLocalizedDescriptionKey: [NSString stringWithFormat:@"The core needs Vulkan, which could not be started: %@",
+                                            vulkanError.localizedDescription]
+            }];
+            return NO;
+        }
+    } else {
+        return YES;
+    }
+    if (_hwRender.context_reset) _hwRender.context_reset();
+    return YES;
+}
+
+- (void)teardownAfterFailedLoad {
+    if (_initialized) _sym.deinit();
+    _initialized = NO;
+    _gameData = nil;
+    _gl = nil;
+    [_vulkan destroy];
+    _vulkan = nil;
+    gActiveCore = nil;
+}
+
+- (void)sanitizeAVInfo {
+    if (_avInfo.timing.fps <= 0 || _avInfo.timing.fps > 500) _avInfo.timing.fps = 60.0;
+    if (_avInfo.timing.sample_rate <= 0) _avInfo.timing.sample_rate = 44100.0;
+    if (_avInfo.geometry.max_width < _avInfo.geometry.base_width) _avInfo.geometry.max_width = _avInfo.geometry.base_width;
+    if (_avInfo.geometry.max_height < _avInfo.geometry.base_height) _avInfo.geometry.max_height = _avInfo.geometry.base_height;
+}
+
+/// Whether the core may run, reset, load or save states and the like. After a
+/// failed GPU frame its resources may still be in use, or the device is gone.
+- (BOOL)isUsable {
+    return _gameLoaded && !_vulkan.hasFailed;
+}
+
+- (void)runFrame {
+    if (!self.isUsable) return;
+    [self deliverKeyEvents];
+    if (_hasFrameTimeCallback && _frameTimeCallback.callback) {
+        _frameTimeCallback.callback(_frameTimeCallback.reference);
+    }
+    if (_gl) [_gl makeCurrent];
+    [_vulkan beginFrame];
+    _sym.run();
+    // Work the core handed over without a video refresh still runs once.
+    [_vulkan submitDuplicateFrame];
+}
+
+- (void)reset {
+    if (!self.isUsable) return;
+    // Vulkan cores may recreate the image they handed over.
+    [_vulkan forgetImage];
+    _sym.reset();
+}
+
+- (void)unloadGame {
+    if (!_gameLoaded || gUnfinishedCore == self) return;
+    [self writeSaveRAMIfChanged];
+    if (_vulkan && ![_vulkan waitIdle]) {
+        os_log_error(URCoreLog(), "Unloading waits until the GPU finishes the core's last frame.");
+        gUnfinishedCore = self;
+        return;
+    }
+    [self tearDownGame];
+}
+
+/// Tears down gUnfinishedCore's game if its GPU work is done by now. NO while
+/// it still runs.
+- (BOOL)finishUnloading {
+    if (![_vulkan settleWithin:0] || ![_vulkan waitIdle]) return NO;
+    [self tearDownGame];
+    gUnfinishedCore = nil;
+    return YES;
+}
+
+/// context_destroy, retro_unload_game, retro_deinit, then the GPU context.
+/// Nothing may run on the GPU any more.
+- (void)tearDownGame {
+    if (_gl) {
+        [_gl makeCurrent];
+        if (_hwRender.context_destroy) _hwRender.context_destroy();
+    } else if (_vulkan) {
+        if (_hwRender.context_destroy) _hwRender.context_destroy();
+    }
+    _sym.unload_game();
+    _sym.deinit();
+    _gameLoaded = NO;
+    _initialized = NO;
+    _gl = nil;
+    [URGLContext clearCurrent];
+    // Same order as RetroArch: the device goes after retro_deinit.
+    [_vulkan destroy];
+    _vulkan = nil;
+    _gameData = nil;
+    if (gActiveCore == self) gActiveCore = nil;
+}
+
+- (BOOL)supportsSaveStates {
+    return self.isUsable && _sym.serialize_size() > 0;
+}
+
+- (nullable NSData *)serializeState {
+    if (!self.isUsable) return nil;
+    size_t size = _sym.serialize_size();
+    if (size == 0) return nil;
+    NSMutableData *data = [NSMutableData dataWithLength:size];
+    if (!_sym.serialize(data.mutableBytes, size)) return nil;
+    return data;
+}
+
+- (BOOL)unserializeState:(NSData *)state {
+    if (!self.isUsable || state.length == 0) return NO;
+    return _sym.unserialize(state.bytes, state.length);
+}
+
+- (size_t)stateSize {
+    return self.isUsable ? _sym.serialize_size() : 0;
+}
+
+- (BOOL)serializeStateIntoBuffer:(NSMutableData *)buffer {
+    if (!self.isUsable) return NO;
+    size_t size = _sym.serialize_size();
+    if (size == 0) return NO;
+    if (buffer.length != size) buffer.length = size;
+    return _sym.serialize(buffer.mutableBytes, size);
+}
+
+- (BOOL)unserializeStateFromBytes:(const void *)bytes length:(size_t)length {
+    if (!self.isUsable || length == 0) return NO;
+    return _sym.unserialize(bytes, length);
+}
+
+#pragma mark - Cheats
+
+- (BOOL)supportsCheats {
+    return _sym.cheat_reset != NULL && _sym.cheat_set != NULL;
+}
+
+- (void)resetCheats {
+    if (self.isUsable && _sym.cheat_reset) _sym.cheat_reset();
+}
+
+- (void)setCheatAtIndex:(NSUInteger)index enabled:(BOOL)enabled code:(NSString *)code {
+    if (!self.isUsable || !_sym.cheat_set) return;
+    _sym.cheat_set((unsigned)index, enabled, code.UTF8String ?: "");
+}
+
+#pragma mark - Memory
+
+- (nullable void *)memoryDataOfType:(unsigned)type size:(size_t *)size {
+    if (!_gameLoaded) {
+        if (size) *size = 0;
+        return NULL;
+    }
+    if (size) *size = _sym.get_memory_size(type);
+    return _sym.get_memory_data(type);
+}
+
+- (NSUInteger)memoryMapRevision { return _memoryMapRevision; }
+
+- (nullable const struct retro_memory_map *)memoryMap {
+    return _memoryDescriptors ? &_memoryMap : NULL;
+}
+
+- (void)clearMemoryMap {
+    for (unsigned i = 0; _memoryDescriptors && i < _memoryMap.num_descriptors; i++) {
+        free((void *)_memoryDescriptors[i].addrspace);
+    }
+    free(_memoryDescriptors);
+    _memoryDescriptors = NULL;
+    memset(&_memoryMap, 0, sizeof(_memoryMap));
+}
+
+- (void)storeMemoryMap:(const struct retro_memory_map *)map {
+    [self clearMemoryMap];
+    if (map && map->descriptors && map->num_descriptors > 0) {
+        _memoryDescriptors = calloc(map->num_descriptors, sizeof(struct retro_memory_descriptor));
+        if (_memoryDescriptors) {
+            memcpy(_memoryDescriptors, map->descriptors, map->num_descriptors * sizeof(struct retro_memory_descriptor));
+            for (unsigned i = 0; i < map->num_descriptors; i++) {
+                if (map->descriptors[i].addrspace) _memoryDescriptors[i].addrspace = strdup(map->descriptors[i].addrspace);
+            }
+            _memoryMap.descriptors = _memoryDescriptors;
+            _memoryMap.num_descriptors = map->num_descriptors;
+        }
+    }
+    _memoryMapRevision++;
+}
+
+#pragma mark - Save RAM
+
+/// Copies the file at `path` into the core's memory region `type` and returns
+/// a snapshot of the region, or nil when the core has no such region.
+- (nullable NSData *)loadMemory:(unsigned)type fromPath:(nullable NSString *)path {
+    if (!path) return nil;
+    void *memory = _sym.get_memory_data(type);
+    size_t size = _sym.get_memory_size(type);
+    if (!memory || size == 0) return nil;
+    NSData *file = [NSData dataWithContentsOfFile:path];
+    if (file.length) {
+        memcpy(memory, file.bytes, MIN(size, file.length));
+    }
+    return [NSData dataWithBytes:memory length:size];
+}
+
+- (void)loadSaveRAM {
+    _lastSavedRAM = [self loadMemory:RETRO_MEMORY_SAVE_RAM fromPath:self.saveRAMPath];
+    _lastSavedRTC = [self loadMemory:RETRO_MEMORY_RTC fromPath:self.rtcPath];
+}
+
+/// Writes memory region `type` to `path` if it differs from `*last`, and
+/// updates `*last` after a successful write. Returns NO with `error` set when
+/// the file could not be written.
+- (BOOL)writeMemory:(unsigned)type toPath:(nullable NSString *)path last:(NSData * __strong _Nullable *)last
+              error:(NSError **)error {
+    if (!path) return YES;
+    void *memory = _sym.get_memory_data(type);
+    size_t size = _sym.get_memory_size(type);
+    if (!memory || size == 0) return YES;
+    if ((*last).length == size && memcmp((*last).bytes, memory, size) == 0) return YES;
+
+    NSData *snapshot = [NSData dataWithBytes:memory length:size];
+    NSString *directory = path.stringByDeletingLastPathComponent;
+    if (![[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:error]
+        || ![snapshot writeToFile:path options:NSDataWritingAtomic error:error]) {
+        return NO;
+    }
+    *last = snapshot;
+    return YES;
+}
+
+- (void)writeSaveRAMIfChanged {
+    if (!_gameLoaded) return;
+    NSError *error = nil;
+    BOOL written = [self writeMemory:RETRO_MEMORY_SAVE_RAM toPath:self.saveRAMPath last:&_lastSavedRAM error:&error]
+        && [self writeMemory:RETRO_MEMORY_RTC toPath:self.rtcPath last:&_lastSavedRTC error:&error];
+    if (written) {
+        _saveFailing = NO;
+        return;
+    }
+    // The next periodic write retries; the user hears about it once.
+    if (_saveFailing) return;
+    _saveFailing = YES;
+    void (^handler)(NSString *) = self.saveErrorHandler;
+    NSString *reason = error.localizedDescription ?: @"";
+    if (handler) dispatch_async(dispatch_get_main_queue(), ^{ handler(reason); });
+}
+
+#pragma mark - Disks
+
+- (NSInteger)diskCount {
+    return (_hasDiskControl && _disk.get_num_images) ? (NSInteger)_disk.get_num_images() : 0;
+}
+
+- (NSInteger)currentDiskIndex {
+    return (_hasDiskControl && _disk.get_image_index) ? (NSInteger)_disk.get_image_index() : 0;
+}
+
+- (BOOL)insertDiskAtIndex:(NSInteger)index {
+    if (!self.isUsable || !_hasDiskControl || index < 0 || index >= self.diskCount) return NO;
+    _disk.set_eject_state(true);
+    BOOL ok = _disk.set_image_index((unsigned)index);
+    _disk.set_eject_state(false);
+    return ok;
+}
+
+#pragma mark - A/V
+
+- (double)framesPerSecond { return _avInfo.timing.fps; }
+- (double)sampleRate { return _avInfo.timing.sample_rate; }
+- (unsigned)baseWidth { return _avInfo.geometry.base_width; }
+- (unsigned)baseHeight { return _avInfo.geometry.base_height; }
+- (BOOL)usesHardwareRendering { return _gl != nil || _vulkan != nil; }
+- (BOOL)shutdownRequested { return _shutdownRequested || _vulkan.hasFailed; }
+
+- (URGraphicsAPI)graphicsAPI {
+    if (_vulkan) return URGraphicsAPIVulkan;
+    return _gl ? URGraphicsAPIOpenGL : URGraphicsAPINone;
+}
+
++ (BOOL)vulkanAvailable { return URVulkanContext.isAvailable; }
+
+- (void)simulateVulkanFenceWaitResult:(int32_t)result {
+    [_vulkan simulateFenceWaitResult:(VkResult)result];
+}
+
+- (BOOL)vulkanBusy { return _vulkan.busy; }
+
+- (float)aspectRatio {
+    float aspect = _avInfo.geometry.aspect_ratio;
+    if (aspect <= 0.0f && _avInfo.geometry.base_height > 0) {
+        aspect = (float)_avInfo.geometry.base_width / (float)_avInfo.geometry.base_height;
+    }
+    return aspect > 0.0f ? aspect : 4.0f / 3.0f;
+}
+
+- (BOOL)consumeAVInfoChange {
+    return atomic_exchange(&_avInfoChanged, false);
+}
+
+- (BOOL)videoEnabled { return atomic_load(&_videoEnabled); }
+- (void)setVideoEnabled:(BOOL)enabled { atomic_store(&_videoEnabled, enabled); }
+- (BOOL)audioEnabled { return atomic_load(&_audioEnabled); }
+- (void)setAudioEnabled:(BOOL)enabled { atomic_store(&_audioEnabled, enabled); }
+
+- (uint64_t)frameSerial { return atomic_load(&_frameSerial); }
+
+- (BOOL)accessLatestFrame:(void (NS_NOESCAPE ^)(const void *, NSInteger, NSInteger, NSInteger))block {
+    os_unfair_lock_lock(&_frameLock);
+    BOOL has = _hasFrame && _ready.data;
+    if (has) block(_ready.data, _ready.width, _ready.height, _ready.width * 4);
+    os_unfair_lock_unlock(&_frameLock);
+    return has;
+}
+
+- (nullable CGImageRef)copyFrameImage {
+    __block CGImageRef image = NULL;
+    [self accessLatestFrame:^(const void *pixels, NSInteger width, NSInteger height, NSInteger pitch) {
+        CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        CGContextRef context = CGBitmapContextCreate(NULL, (size_t)width, (size_t)height, 8, (size_t)pitch, space,
+                                                     kCGBitmapByteOrder32Little | (CGBitmapInfo)kCGImageAlphaNoneSkipFirst);
+        if (context) {
+            memcpy(CGBitmapContextGetData(context), pixels, (size_t)(pitch * height));
+            image = CGBitmapContextCreateImage(context);
+            CGContextRelease(context);
+        }
+        CGColorSpaceRelease(space);
+    }];
+    return image;
+}
+
+- (void)publishBackBuffer {
+    os_unfair_lock_lock(&_frameLock);
+    URFrameBuffer tmp = _ready;
+    _ready = _back;
+    _back = tmp;
+    _hasFrame = YES;
+    os_unfair_lock_unlock(&_frameLock);
+    atomic_fetch_add(&_frameSerial, 1);
+}
+
+static void URFrameBufferEnsure(URFrameBuffer *buffer, unsigned width, unsigned height) {
+    size_t needed = (size_t)width * height * 4;
+    if (buffer->capacity < needed) {
+        free(buffer->data);
+        buffer->data = malloc(needed);
+        buffer->capacity = needed;
+    }
+    buffer->width = width;
+    buffer->height = height;
+}
+
+#pragma mark - Input
+
+- (void)setButtonMask:(uint32_t)mask forPort:(NSInteger)port {
+    if (port >= 0 && port < URMaxPorts) atomic_store(&gButtonMasks[port], mask);
+}
+
+- (void)setAnalogStick:(URAnalogStick)stick x:(int16_t)x y:(int16_t)y forPort:(NSInteger)port {
+    if (port < 0 || port >= URMaxPorts) return;
+    atomic_store(&gAnalog[port][stick][0], x);
+    atomic_store(&gAnalog[port][stick][1], y);
+}
+
+- (void)setPointerX:(int16_t)x y:(int16_t)y pressed:(BOOL)pressed {
+    atomic_store(&gPointerX, x);
+    atomic_store(&gPointerY, y);
+    atomic_store(&gPointerPressed, pressed);
+}
+
+- (void)setTurboMask:(uint32_t)mask forPort:(NSInteger)port {
+    if (port >= 0 && port < URMaxPorts) atomic_store(&gTurboMasks[port], mask);
+}
+
+- (NSInteger)turboPeriod { return atomic_load(&_turboPeriod); }
+- (void)setTurboPeriod:(NSInteger)period { atomic_store(&_turboPeriod, MAX(1, period)); }
+
+- (void)advanceTurboClock {
+    _turboClock++;
+    NSInteger period = MAX(1, atomic_load(&_turboPeriod));
+    atomic_store(&gTurboReleased, (_turboClock / (uint64_t)period) % 2 == 1);
+}
+
+#pragma mark - Keyboard
+
+- (BOOL)wantsKeyboard { return _hasKeyboardCallback; }
+
+- (void)setKey:(unsigned)retroKey pressed:(BOOL)pressed character:(uint32_t)character modifiers:(uint16_t)modifiers {
+    if (retroKey >= RETROK_LAST) return;
+    bool wasPressed = atomic_exchange(&gKeys[retroKey], pressed);
+    if (wasPressed == pressed && character == 0) return;
+    os_unfair_lock_lock(&_keyLock);
+    if (_keyEventCount == _keyEventCapacity) {
+        size_t capacity = _keyEventCapacity ? _keyEventCapacity * 2 : 32;
+        URKeyEvent *events = realloc(_keyEvents, capacity * sizeof(URKeyEvent));
+        if (events) {
+            _keyEvents = events;
+            _keyEventCapacity = capacity;
+        }
+    }
+    if (_keyEventCount < _keyEventCapacity) {
+        _keyEvents[_keyEventCount++] = (URKeyEvent){pressed, retroKey, character, modifiers};
+    }
+    os_unfair_lock_unlock(&_keyLock);
+}
+
+- (void)releaseAllKeys {
+    for (unsigned key = 0; key < RETROK_LAST; key++) {
+        if (atomic_load(&gKeys[key])) [self setKey:key pressed:NO character:0 modifiers:0];
+    }
+}
+
+/// Hands queued key events to the core's keyboard callback (emulation thread).
+- (void)deliverKeyEvents {
+    os_unfair_lock_lock(&_keyLock);
+    size_t count = _keyEventCount;
+    URKeyEvent *pending = NULL;
+    if (count > 0 && (pending = malloc(count * sizeof(URKeyEvent)))) {
+        memcpy(pending, _keyEvents, count * sizeof(URKeyEvent));
+    }
+    _keyEventCount = 0;
+    os_unfair_lock_unlock(&_keyLock);
+    if (!pending) return;
+    if (!_hasKeyboardCallback || !_keyboardCallback.callback) {
+        free(pending);
+        return;
+    }
+    for (size_t i = 0; i < count; i++) {
+        _keyboardCallback.callback(pending[i].down, pending[i].keycode, pending[i].character, pending[i].modifiers);
+    }
+    free(pending);
+}
+
+- (void)reportRumbleOnPort:(unsigned)port effect:(enum retro_rumble_effect)effect strength:(uint16_t)strength {
+    if (port >= UR_MAX_PORTS || (effect != RETRO_RUMBLE_STRONG && effect != RETRO_RUMBLE_WEAK)) return;
+    if (_rumble[port][effect] == strength) return;
+    _rumble[port][effect] = strength;
+    void (^handler)(NSInteger, BOOL, uint16_t) = self.rumbleHandler;
+    if (handler) handler((NSInteger)port, effect == RETRO_RUMBLE_STRONG, strength);
+}
+
+#pragma mark - Options
+
+- (NSArray<URCoreOption *> *)options {
+    @synchronized(self) { return [_optionDefinitions copy]; }
+}
+
+- (nullable NSString *)valueForOption:(NSString *)key {
+    @synchronized(self) {
+        NSData *value = _optionValues[key];
+        return value ? [[NSString alloc] initWithUTF8String:value.bytes] : nil;
+    }
+}
+
+- (void)setValue:(NSString *)value forOption:(NSString *)key {
+    @synchronized(self) {
+        [self storeOption:key value:value];
+        _optionsUpdated = YES;
+    }
+}
+
+/// Must be called while synchronized on self.
+- (void)storeOption:(NSString *)key value:(NSString *)value {
+    NSString *text = value ?: @"";
+    NSData *string = _optionCStrings[text];
+    if (!string) {
+        const char *utf8 = text.UTF8String ?: "";
+        string = [NSData dataWithBytes:utf8 length:strlen(utf8) + 1];
+        _optionCStrings[text] = string;
+    }
+    _optionValues[key] = string;
+}
+
+- (void)registerOption:(URCoreOption *)option {
+    @synchronized(self) {
+        NSUInteger existing = [_optionDefinitions indexOfObjectPassingTest:^BOOL(URCoreOption *o, NSUInteger idx, BOOL *stop) {
+            return [o.key isEqualToString:option.key];
+        }];
+        if (existing != NSNotFound) {
+            [_optionDefinitions replaceObjectAtIndex:existing withObject:option];
+        } else {
+            [_optionDefinitions addObject:option];
+        }
+        NSString *override = self.optionOverrides[option.key];
+        if (override && [option.values containsObject:override]) {
+            [self storeOption:option.key value:override];
+        } else if (!_optionValues[option.key] || ![option.values containsObject:[self valueForOption:option.key]]) {
+            [self storeOption:option.key value:option.defaultValue];
+        }
+    }
+}
+
+- (void)resetOptionDefinitions {
+    @synchronized(self) { [_optionDefinitions removeAllObjects]; }
+}
+
+- (const char *)optionValueCString:(const char *)key {
+    @synchronized(self) {
+        NSString *k = @(key);
+        NSData *value = _optionValues[k];
+        if (!value) {
+            NSString *override = self.optionOverrides[k];
+            if (override) {
+                [self storeOption:k value:override];
+                value = _optionValues[k];
+            }
+        }
+        return value ? value.bytes : NULL;
+    }
+}
+
+- (BOOL)consumeOptionsUpdated {
+    @synchronized(self) {
+        BOOL updated = _optionsUpdated;
+        _optionsUpdated = NO;
+        return updated;
+    }
+}
+
+#pragma mark - Messages
+
+- (void)postMessage:(NSString *)message duration:(NSTimeInterval)duration {
+    void (^handler)(NSString *, NSTimeInterval) = self.messageHandler;
+    if (!handler || message.length == 0) return;
+    dispatch_async(dispatch_get_main_queue(), ^{ handler(message, duration); });
+}
+
+@end
+
+#pragma mark - libretro callbacks
+
+static void URCoreLogPrintf(enum retro_log_level level, const char *fmt, ...) {
+    char buffer[2048];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buffer, sizeof(buffer), fmt, args);
+    va_end(args);
+    size_t length = strlen(buffer);
+    while (length > 0 && (buffer[length - 1] == '\n' || buffer[length - 1] == '\r')) buffer[--length] = 0;
+
+    static int mirrorToStderr = -1;
+    if (mirrorToStderr < 0) mirrorToStderr = getenv("ATRIUM_CORE_LOG") != NULL;
+    if (mirrorToStderr) fprintf(stderr, "[core:%d] %s\n", (int)level, buffer);
+
+    switch (level) {
+        case RETRO_LOG_DEBUG: os_log_debug(URCoreLog(), "%{public}s", buffer); break;
+        case RETRO_LOG_INFO: os_log_info(URCoreLog(), "%{public}s", buffer); break;
+        case RETRO_LOG_WARN: os_log(URCoreLog(), "[warn] %{public}s", buffer); break;
+        default: os_log_error(URCoreLog(), "%{public}s", buffer); break;
+    }
+}
+
+static retro_time_t URPerfGetTimeUsec(void) {
+    static mach_timebase_info_data_t timebase;
+    if (timebase.denom == 0) mach_timebase_info(&timebase);
+    return (retro_time_t)(mach_absolute_time() * timebase.numer / timebase.denom / 1000);
+}
+static retro_perf_tick_t URPerfGetCounter(void) { return mach_absolute_time(); }
+static uint64_t URPerfGetCPUFeatures(void) { return RETRO_SIMD_NEON | RETRO_SIMD_ASIMD; }
+static void URPerfLog(void) {}
+static void URPerfRegister(struct retro_perf_counter *counter) { counter->registered = true; }
+static void URPerfStart(struct retro_perf_counter *counter) {
+    counter->call_cnt++;
+    counter->start = URPerfGetCounter();
+}
+static void URPerfStop(struct retro_perf_counter *counter) {
+    counter->total += URPerfGetCounter() - counter->start;
+}
+
+static bool URCoreSetRumble(unsigned port, enum retro_rumble_effect effect, uint16_t strength) {
+    URLibretroCore *core = gActiveCore;
+    if (core) [core reportRumbleOnPort:port effect:effect strength:strength];
+    return true;
+}
+
+static uintptr_t URCoreHWGetFramebuffer(void) {
+    URLibretroCore *core = gActiveCore;
+    return core ? core->_gl.framebufferID : 0;
+}
+
+static retro_proc_address_t URCoreHWGetProcAddress(const char *symbol) {
+    return (retro_proc_address_t)[URGLContext procAddress:symbol];
+}
+
+static NSString *URString(const char *value) {
+    return value ? ([NSString stringWithUTF8String:value] ?: @"") : @"";
+}
+
+static void URRegisterOptionsV1(URLibretroCore *core, const struct retro_core_option_definition *definitions) {
+    [core resetOptionDefinitions];
+    for (const struct retro_core_option_definition *def = definitions; def && def->key; def++) {
+        NSMutableArray *values = [NSMutableArray array];
+        NSMutableArray *labels = [NSMutableArray array];
+        for (int i = 0; i < RETRO_NUM_CORE_OPTION_VALUES_MAX && def->values[i].value; i++) {
+            [values addObject:URString(def->values[i].value)];
+            [labels addObject:def->values[i].label ? URString(def->values[i].label) : URString(def->values[i].value)];
+        }
+        if (values.count == 0) continue;
+        NSString *defaultValue = def->default_value ? URString(def->default_value) : values.firstObject;
+        [core registerOption:[[URCoreOption alloc] initWithKey:URString(def->key)
+                                                         title:URString(def->desc)
+                                                          info:def->info ? URString(def->info) : nil
+                                                      category:nil
+                                                        values:values
+                                                        labels:labels
+                                                  defaultValue:defaultValue]];
+    }
+}
+
+static void URRegisterOptionsV2(URLibretroCore *core, const struct retro_core_options_v2 *options) {
+    [core resetOptionDefinitions];
+    if (!options || !options->definitions) return;
+    for (const struct retro_core_option_v2_definition *def = options->definitions; def->key; def++) {
+        NSMutableArray *values = [NSMutableArray array];
+        NSMutableArray *labels = [NSMutableArray array];
+        for (int i = 0; i < RETRO_NUM_CORE_OPTION_VALUES_MAX && def->values[i].value; i++) {
+            [values addObject:URString(def->values[i].value)];
+            [labels addObject:def->values[i].label ? URString(def->values[i].label) : URString(def->values[i].value)];
+        }
+        if (values.count == 0) continue;
+        NSString *defaultValue = def->default_value ? URString(def->default_value) : values.firstObject;
+        [core registerOption:[[URCoreOption alloc] initWithKey:URString(def->key)
+                                                         title:URString(def->desc)
+                                                          info:def->info ? URString(def->info) : nil
+                                                      category:def->category_key ? URString(def->category_key) : nil
+                                                        values:values
+                                                        labels:labels
+                                                  defaultValue:defaultValue]];
+    }
+}
+
+static void URRegisterVariables(URLibretroCore *core, const struct retro_variable *variables) {
+    [core resetOptionDefinitions];
+    for (const struct retro_variable *var = variables; var && var->key; var++) {
+        // Format: "Description; value1|value2|value3" — first value is the default.
+        NSString *spec = URString(var->value);
+        NSRange separator = [spec rangeOfString:@"; "];
+        NSString *title = separator.location != NSNotFound ? [spec substringToIndex:separator.location] : URString(var->key);
+        NSString *list = separator.location != NSNotFound ? [spec substringFromIndex:NSMaxRange(separator)] : spec;
+        NSArray *values = [list componentsSeparatedByString:@"|"];
+        if (values.count == 0) continue;
+        [core registerOption:[[URCoreOption alloc] initWithKey:URString(var->key)
+                                                         title:title
+                                                          info:nil
+                                                      category:nil
+                                                        values:values
+                                                        labels:values
+                                                  defaultValue:values.firstObject]];
+    }
+}
+
+/// The libretro language for the user's language code; English when the core can't tell it apart.
+static unsigned URRetroLanguage(NSString *code) {
+    if ([code hasPrefix:@"de"]) return RETRO_LANGUAGE_GERMAN;
+    if ([code hasPrefix:@"fr"]) return RETRO_LANGUAGE_FRENCH;
+    if ([code hasPrefix:@"es"]) return RETRO_LANGUAGE_SPANISH;
+    if ([code hasPrefix:@"it"]) return RETRO_LANGUAGE_ITALIAN;
+    if ([code hasPrefix:@"ja"]) return RETRO_LANGUAGE_JAPANESE;
+    return RETRO_LANGUAGE_ENGLISH;
+}
+
+static void URFillPerfInterface(struct retro_perf_callback *cb) {
+    cb->get_time_usec = URPerfGetTimeUsec;
+    cb->get_cpu_features = URPerfGetCPUFeatures;
+    cb->get_perf_counter = URPerfGetCounter;
+    cb->perf_register = URPerfRegister;
+    cb->perf_start = URPerfStart;
+    cb->perf_stop = URPerfStop;
+    cb->perf_log = URPerfLog;
+}
+
+/// RETRO_ENVIRONMENT_SET_HW_RENDER: Vulkan is set up once the game is
+/// loaded, OpenGL right away. False for APIs this Mac lacks, so the core
+/// can fall back to another one or to software rendering.
+static bool URSetHWRender(URLibretroCore *core, struct retro_hw_render_callback *hw) {
+    if (hw->context_type == RETRO_HW_CONTEXT_VULKAN) {
+        // The context is created once the game is loaded; refusing
+        // here lets the core fall back to OpenGL or software.
+        if (!URVulkanContext.isAvailable) return false;
+        hw->get_current_framebuffer = NULL;
+        hw->get_proc_address = NULL;
+        core->_hwRender = *hw;
+        core->_gl = nil;
+        core->_wantsVulkan = YES;
+        return true;
+    }
+    BOOL coreProfile;
+    if (hw->context_type == RETRO_HW_CONTEXT_OPENGL_CORE) {
+        coreProfile = YES;
+    } else if (hw->context_type == RETRO_HW_CONTEXT_OPENGL) {
+        coreProfile = NO;
+    } else {
+        return false; // GLES / Direct3D are not available.
+    }
+    NSError *error = nil;
+    URGLContext *gl = [[URGLContext alloc] initWithCoreProfile:coreProfile depth:hw->depth stencil:hw->stencil error:&error];
+    if (!gl) {
+        URCoreLogPrintf(RETRO_LOG_ERROR, "%s", error.localizedDescription.UTF8String);
+        return false;
+    }
+    [gl makeCurrent];
+    hw->get_current_framebuffer = URCoreHWGetFramebuffer;
+    hw->get_proc_address = URCoreHWGetProcAddress;
+    core->_hwRender = *hw;
+    core->_gl = gl;
+    core->_wantsVulkan = NO;
+    return true;
+}
+
+/// RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: new timing and geometry; the
+/// OpenGL frame buffer grows to the new maximum size.
+static void URSetSystemAVInfo(URLibretroCore *core, const struct retro_system_av_info *info) {
+    core->_avInfo = *info;
+    [core sanitizeAVInfo];
+    if (core->_gl) {
+        [core->_gl resizeFramebufferWidth:MAX(core->_gl.framebufferWidth, info->geometry.max_width)
+                                   height:MAX(core->_gl.framebufferHeight, info->geometry.max_height)];
+    }
+    atomic_store(&core->_avInfoChanged, true);
+}
+
+/// Keeps the core's disc control callbacks; the basic interface is the
+/// extended one without its trailing members. NULL removes them.
+static void URSetDiskControl(URLibretroCore *core, const void *callbacks, size_t size) {
+    memset(&core->_disk, 0, sizeof(core->_disk));
+    if (callbacks) memcpy(&core->_disk, callbacks, size);
+    core->_hasDiskControl = callbacks && core->_disk.get_num_images && core->_disk.set_image_index
+        && core->_disk.set_eject_state;
+}
+
+bool URCoreEnvironment(unsigned cmd, void *data) {
+    URLibretroCore *core = gActiveCore;
+    if (!core) return false;
+
+    // Only a few commands legitimately pass NULL; never dereference it otherwise.
+    if (!data) {
+        switch (cmd) {
+            case RETRO_ENVIRONMENT_SHUTDOWN:
+            case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS:
+            case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
+            case RETRO_ENVIRONMENT_SET_VARIABLE:
+            case RETRO_ENVIRONMENT_SET_VARIABLES:
+            case RETRO_ENVIRONMENT_SET_CORE_OPTIONS:
+            case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2:
+            case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
+            case RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE:
+                break;
+            default:
+                return false;
+        }
+    }
+
+    switch (cmd) {
+        case RETRO_ENVIRONMENT_GET_CAN_DUPE:
+            *(bool *)data = true;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_OVERSCAN:
+            *(bool *)data = false;
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_ROTATION: {
+            core->_rotation = (NSInteger)(*(const unsigned *)data % 4);
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_SET_MESSAGE: {
+            const struct retro_message *msg = data;
+            if (msg && msg->msg) [core postMessage:URString(msg->msg) duration:MAX(msg->frames / 60.0, 2.0)];
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_SET_MESSAGE_EXT: {
+            const struct retro_message_ext *msg = data;
+            if (!msg || !msg->msg) return true;
+            if (msg->target == RETRO_MESSAGE_TARGET_LOG) {
+                URCoreLogPrintf(msg->level, "%s", msg->msg);
+            } else if (msg->type != RETRO_MESSAGE_TYPE_PROGRESS) {
+                [core postMessage:URString(msg->msg) duration:MAX(msg->duration / 1000.0, 2.0)];
+            }
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION:
+            *(unsigned *)data = 1;
+            return true;
+
+        case RETRO_ENVIRONMENT_SHUTDOWN:
+            core->_shutdownRequested = YES;
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+        case RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY:
+            *(const char **)data = core->_systemDirC;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
+            *(const char **)data = core->_saveDirC;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_LIBRETRO_PATH:
+            *(const char **)data = core->_corePathC;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_USERNAME:
+            *(const char **)data = core->_usernameC;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_LANGUAGE:
+            *(unsigned *)data = URRetroLanguage(core.languageCode);
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: {
+            enum retro_pixel_format format = *(const enum retro_pixel_format *)data;
+            if (format > RETRO_PIXEL_FORMAT_XRGB2101010) return false;
+            core->_pixelFormat = format;
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_SET_MEMORY_MAPS:
+            [core storeMemoryMap:data];
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK: {
+            const struct retro_keyboard_callback *cb = data;
+            core->_keyboardCallback = *cb;
+            core->_hasKeyboardCallback = cb->callback != NULL;
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
+        case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
+        case RETRO_ENVIRONMENT_SET_SUBSYSTEM_INFO:
+        case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
+        case RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS:
+        case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY:
+        case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK:
+        case RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE:
+        case RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS:
+        case RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY:
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS:
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_INPUT_MAX_USERS:
+            *(unsigned *)data = (unsigned)URMaxPorts;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES:
+            *(uint64_t *)data = (1 << RETRO_DEVICE_JOYPAD) | (1 << RETRO_DEVICE_ANALOG) | (1 << RETRO_DEVICE_POINTER)
+                | (1 << RETRO_DEVICE_KEYBOARD);
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_VARIABLE: {
+            struct retro_variable *var = data;
+            if (!var || !var->key) return false;
+            var->value = [core optionValueCString:var->key];
+            return var->value != NULL;
+        }
+
+        case RETRO_ENVIRONMENT_SET_VARIABLES:
+            URRegisterVariables(core, data);
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_VARIABLE: {
+            const struct retro_variable *var = data;
+            if (!data) return true; // query for support
+            if (var->key && var->value) [core setValue:URString(var->value) forOption:URString(var->key)];
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
+            *(bool *)data = [core consumeOptionsUpdated];
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION:
+            *(unsigned *)data = 2;
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_CORE_OPTIONS:
+            URRegisterOptionsV1(core, data);
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_INTL: {
+            const struct retro_core_options_intl *intl = data;
+            URRegisterOptionsV1(core, intl ? intl->us : NULL);
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2:
+            URRegisterOptionsV2(core, data);
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL: {
+            const struct retro_core_options_v2_intl *intl = data;
+            URRegisterOptionsV2(core, intl ? intl->us : NULL);
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_GET_LOG_INTERFACE: {
+            struct retro_log_callback *cb = data;
+            cb->log = URCoreLogPrintf;
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_GET_PERF_INTERFACE:
+            URFillPerfInterface(data);
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: {
+            struct retro_rumble_interface *rumble = data;
+            rumble->set_rumble_state = URCoreSetRumble;
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK: {
+            const struct retro_frame_time_callback *cb = data;
+            core->_frameTimeCallback = *cb;
+            core->_hasFrameTimeCallback = cb->callback != NULL;
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
+            URSetSystemAVInfo(core, data);
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_GEOMETRY: {
+            const struct retro_game_geometry *geometry = data;
+            core->_avInfo.geometry.base_width = geometry->base_width;
+            core->_avInfo.geometry.base_height = geometry->base_height;
+            core->_avInfo.geometry.aspect_ratio = geometry->aspect_ratio;
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER:
+            *(unsigned *)data = core.preferredGraphicsAPI == URGraphicsAPIVulkan && URVulkanContext.isAvailable
+                ? RETRO_HW_CONTEXT_VULKAN : RETRO_HW_CONTEXT_OPENGL_CORE;
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_HW_RENDER:
+            return URSetHWRender(core, data);
+
+        case RETRO_ENVIRONMENT_GET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_SUPPORT: {
+            struct retro_hw_render_context_negotiation_interface *iface = data;
+            if (!iface) return false;
+            iface->interface_version = iface->interface_type == RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN
+                ? RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION : 0;
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE: {
+            const struct retro_hw_render_context_negotiation_interface *iface = data;
+            if (!iface || iface->interface_type != RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN) return false;
+            core->_vulkanNegotiation = data;
+            return true;
+        }
+
+        case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:
+            if (!core->_vulkan || !data) return false;
+            *(const struct retro_hw_render_interface **)data =
+                (const struct retro_hw_render_interface *)core->_vulkan.renderInterface;
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
+            return false;
+
+        case RETRO_ENVIRONMENT_GET_DISK_CONTROL_INTERFACE_VERSION:
+            *(unsigned *)data = 1;
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
+            URSetDiskControl(core, data, sizeof(struct retro_disk_control_callback));
+            return true;
+
+        case RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE:
+            URSetDiskControl(core, data, sizeof(struct retro_disk_control_ext_callback));
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
+            if (data) *(int *)data = (atomic_load(&core->_videoEnabled) ? 1 : 0) | (atomic_load(&core->_audioEnabled) ? 2 : 0);
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_FASTFORWARDING:
+            *(bool *)data = core.fastForwarding;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_TARGET_REFRESH_RATE:
+            *(float *)data = 60.0f;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_JIT_CAPABLE:
+            *(bool *)data = true;
+            return true;
+
+        case RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT:
+            *(int *)data = RETRO_SAVESTATE_CONTEXT_NORMAL;
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+static inline uint32_t URConvert565(uint16_t p) {
+    uint32_t r = (p >> 11) & 0x1F, g = (p >> 5) & 0x3F, b = p & 0x1F;
+    return 0xFF000000u | (((r << 3) | (r >> 2)) << 16) | (((g << 2) | (g >> 4)) << 8) | ((b << 3) | (b >> 2));
+}
+
+static inline uint32_t URConvert1555(uint16_t p) {
+    uint32_t r = (p >> 10) & 0x1F, g = (p >> 5) & 0x1F, b = p & 0x1F;
+    return 0xFF000000u | (((r << 3) | (r >> 2)) << 16) | (((g << 3) | (g >> 2)) << 8) | ((b << 3) | (b >> 2));
+}
+
+static inline uint32_t URConvert2101010(uint32_t p) {
+    uint32_t r = (p >> 22) & 0xFF, g = (p >> 12) & 0xFF, b = (p >> 2) & 0xFF;
+    return 0xFF000000u | (r << 16) | (g << 8) | b;
+}
+
+void URCoreVideoRefresh(const void *data, unsigned width, unsigned height, size_t pitch) {
+    URLibretroCore *core = gActiveCore;
+    if (!core) return;
+    if (core->_vulkan && (!data || data == RETRO_HW_FRAME_BUFFER_VALID)) {
+        // Every refresh takes what the core handed over with it (its signal
+        // semaphore even on a duplicate frame), within this call.
+        if (!data) {
+            [core->_vulkan submitDuplicateFrame];
+        } else if (width == 0 || height == 0 || !atomic_load(&core->_videoEnabled)) {
+            // A frame nobody sees, but the core's GPU work must still run.
+            [core->_vulkan submitFrameWidth:0 height:0 destination:NULL];
+        } else {
+            URFrameBuffer *back = &core->_back;
+            URFrameBufferEnsure(back, width, height);
+            if ([core->_vulkan submitFrameWidth:width height:height destination:back->data]) [core publishBackBuffer];
+        }
+        return;
+    }
+    if (!data || width == 0 || height == 0) return; // NULL = duplicate frame
+    if (!atomic_load(&core->_videoEnabled)) return;
+
+    URFrameBuffer *back = &core->_back;
+    URFrameBufferEnsure(back, width, height);
+
+    if (data == RETRO_HW_FRAME_BUFFER_VALID) {
+        if (!core->_gl) return;
+        [core->_gl readPixelsWidth:width height:height
+                  bottomLeftOrigin:core->_hwRender.bottom_left_origin
+                       destination:back->data];
+        [core publishBackBuffer];
+        return;
+    }
+
+    const uint8_t *src = data;
+    uint32_t *dst = (uint32_t *)back->data;
+    switch (core->_pixelFormat) {
+        case RETRO_PIXEL_FORMAT_XRGB8888:
+            for (unsigned y = 0; y < height; y++) {
+                memcpy(dst + (size_t)y * width, src + (size_t)y * pitch, (size_t)width * 4);
+            }
+            break;
+        case RETRO_PIXEL_FORMAT_RGB565:
+            for (unsigned y = 0; y < height; y++) {
+                const uint16_t *row = (const uint16_t *)(src + (size_t)y * pitch);
+                uint32_t *out = dst + (size_t)y * width;
+                for (unsigned x = 0; x < width; x++) out[x] = URConvert565(row[x]);
+            }
+            break;
+        case RETRO_PIXEL_FORMAT_XRGB2101010:
+            for (unsigned y = 0; y < height; y++) {
+                const uint32_t *row = (const uint32_t *)(src + (size_t)y * pitch);
+                uint32_t *out = dst + (size_t)y * width;
+                for (unsigned x = 0; x < width; x++) out[x] = URConvert2101010(row[x]);
+            }
+            break;
+        default:
+            for (unsigned y = 0; y < height; y++) {
+                const uint16_t *row = (const uint16_t *)(src + (size_t)y * pitch);
+                uint32_t *out = dst + (size_t)y * width;
+                for (unsigned x = 0; x < width; x++) out[x] = URConvert1555(row[x]);
+            }
+            break;
+    }
+    [core publishBackBuffer];
+}
+
+void URCoreAudioSample(int16_t left, int16_t right) {
+    URLibretroCore *core = gActiveCore;
+    if (!core || !atomic_load(&core->_audioEnabled)) return;
+    int16_t frame[2] = {left, right};
+    URAudioRingWrite(&core->_ring, frame, 1);
+}
+
+size_t URCoreAudioSampleBatch(const int16_t *data, size_t frames) {
+    URLibretroCore *core = gActiveCore;
+    if (!core || !atomic_load(&core->_audioEnabled)) return frames;
+    URAudioRingWrite(&core->_ring, data, frames);
+    return frames;
+}
+
+void URCoreInputPoll(void) {}
+
+/// The buttons held on `port`, with turbo buttons released every other beat.
+static inline uint32_t URCurrentButtons(unsigned port) {
+    uint32_t mask = atomic_load_explicit(&gButtonMasks[port], memory_order_relaxed);
+    if (atomic_load_explicit(&gTurboReleased, memory_order_relaxed)) {
+        mask &= ~atomic_load_explicit(&gTurboMasks[port], memory_order_relaxed);
+    }
+    return mask;
+}
+
+int16_t URCoreInputState(unsigned port, unsigned device, unsigned index, unsigned id) {
+    if (port >= URMaxPorts) return 0;
+    switch (device & RETRO_DEVICE_MASK) {
+        case RETRO_DEVICE_JOYPAD: {
+            uint32_t mask = URCurrentButtons(port);
+            if (id == RETRO_DEVICE_ID_JOYPAD_MASK) return (int16_t)(mask & 0xFFFF);
+            return (id < 16) ? (int16_t)((mask >> id) & 1) : 0;
+        }
+        case RETRO_DEVICE_ANALOG: {
+            if (index < 2 && id < 2) return atomic_load_explicit(&gAnalog[port][index][id], memory_order_relaxed);
+            if (index == RETRO_DEVICE_INDEX_ANALOG_BUTTON && id < 16) {
+                uint32_t mask = URCurrentButtons(port);
+                return ((mask >> id) & 1) ? 0x7FFF : 0;
+            }
+            return 0;
+        }
+        case RETRO_DEVICE_KEYBOARD:
+            return (id < RETROK_LAST && atomic_load_explicit(&gKeys[id], memory_order_relaxed)) ? 1 : 0;
+        case RETRO_DEVICE_POINTER: {
+            if (port != 0 || index != 0) return 0;
+            switch (id) {
+                case RETRO_DEVICE_ID_POINTER_X: return atomic_load(&gPointerX);
+                case RETRO_DEVICE_ID_POINTER_Y: return atomic_load(&gPointerY);
+                case RETRO_DEVICE_ID_POINTER_PRESSED: return atomic_load(&gPointerPressed) ? 1 : 0;
+                case RETRO_DEVICE_ID_POINTER_COUNT: return 1;
+                default: return 0;
+            }
+        }
+        default:
+            return 0;
+    }
+}

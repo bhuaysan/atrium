@@ -2,23 +2,23 @@
 
 ## Supported versions
 
-Ursprung is in early development. Security fixes are made on `main` and
+Atrium is in early development. Security fixes are made on `main` and
 included in the next release.
 
 ## Reporting a vulnerability
 
 Please **do not open a public issue** for security problems. Use GitHub's
-[private vulnerability reporting](https://github.com/bhuaysan/ursprung/security/advisories/new)
+[private vulnerability reporting](https://github.com/bhuaysan/atrium/security/advisories/new)
 instead. Include steps to reproduce and the affected version or commit.
 
 You can expect a first response within a week.
 
 ## Scope and design notes
 
-Ursprung loads third-party native code: libretro cores are downloaded over
+Atrium loads third-party native code: libretro cores are downloaded over
 HTTPS from `buildbot.libretro.com` and executed in-process. For that reason the
 app is not sandboxed and its hardened runtime allows JIT and unsigned libraries
-(`Ursprung/Ursprung.entitlements`). Reports about the core download and loading
+(`Atrium/Atrium.entitlements`). Reports about the core download and loading
 path are especially welcome.
 
 Other relevant areas:

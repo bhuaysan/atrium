@@ -1,7 +1,7 @@
 # librashader
 
 [librashader](https://github.com/SnowflakePowered/librashader) 0.12.0 by
-SnowflakePowered and contributors. Ursprung uses it to run RetroArch slang
+SnowflakePowered and contributors. Atrium uses it to run RetroArch slang
 shader presets (`.slangp`) on Metal; see `docs/SHADER_PLAN.md`.
 
 ## Licences
@@ -22,7 +22,7 @@ shader presets (`.slangp`) on Metal; see `docs/SHADER_PLAN.md`.
   `librashader-aarch64-macos-v0.12.0-optimized.zip` from the GitHub release,
   checks its SHA-256, sets the install name to `@rpath/librashader.dylib` and
   puts the dylib here. Xcode links it and embeds it, re-signed, in
-  `Ursprung.app/Contents/Frameworks`.
+  `Atrium.app/Contents/Frameworks`.
 
 ## Known issue
 

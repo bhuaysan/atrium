@@ -1,6 +1,6 @@
 #!/usr/bin/env swift
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Renders the Ursprung app icon (a graphite D-pad on coral) into the asset catalog and docs/icon.png.
+// Renders the Atrium app icon (a graphite D-pad on coral) into the asset catalog and docs/icon.png.
 //
 //   swift Scripts/generate-icon.swift
 
@@ -9,7 +9,7 @@ import CoreGraphics
 
 let output = URL(fileURLWithPath: CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
-    : "Ursprung/Resources/Assets.xcassets/AppIcon.appiconset")
+    : "Atrium/Resources/Assets.xcassets/AppIcon.appiconset")
 
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
 

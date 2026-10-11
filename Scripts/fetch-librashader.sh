@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Downloads the prebuilt librashader dylib that Ursprung links and embeds
+# Downloads the prebuilt librashader dylib that Atrium links and embeds
 # (see ThirdParty/librashader/README.md). The binary is not committed: this
 # script fetches the pinned release, checks its SHA-256 and gives it an
 # @rpath install name. It does nothing when that version is already there.

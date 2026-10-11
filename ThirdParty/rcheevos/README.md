@@ -1,7 +1,7 @@
 # rcheevos
 
 [rcheevos](https://github.com/RetroAchievements/rcheevos) 12.5.0 by
-RetroAchievements.org, MIT License (see `LICENSE`). Ursprung uses it for
+RetroAchievements.org, MIT License (see `LICENSE`). Atrium uses it for
 RetroAchievements: `rc_client` signs in, identifies games and evaluates
 achievements; `rc_libretro` maps the memory of libretro cores.
 

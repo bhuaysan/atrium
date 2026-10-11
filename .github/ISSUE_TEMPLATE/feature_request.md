@@ -4,7 +4,7 @@ about: Suggest an idea or a new system
 labels: enhancement
 ---
 
-**What would you like Ursprung to do?**
+**What would you like Atrium to do?**
 
 **Why is it useful?**
 

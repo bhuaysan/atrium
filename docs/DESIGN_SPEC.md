@@ -1,8 +1,8 @@
-# Ursprung — Redesign Design Specification
+# Atrium — Redesign Design Specification
 
 Phase 2 · 30 September 2026. Living version with comments: https://claude.ai/code/artifact/137d052c-6149-444c-ad10-c7375e536127
 
-This spec redesigns the presentation of every Ursprung surface without changing its workflows, data model or emulation lifecycle. It is based on the code at commit f3595ce (main) and names the current file where a change lands.
+This spec redesigns the presentation of every Atrium surface without changing its workflows, data model or emulation lifecycle. It is based on the code at commit f3595ce (main) and names the current file where a change lands.
 
 Every recommendation carries one label:
 
@@ -14,7 +14,7 @@ Measurements are in points (pt). SwiftUI text styles are named with their defaul
 
 ## A. Product visual direction
 
-Ursprung should feel like a well-lit shelf of games inside a quiet Mac app: the box art carries the colour, the chrome stays monochrome with one accent. Reference points are Finder icon view, Photos and Music, not a game launcher skin.
+Atrium should feel like a well-lit shelf of games inside a quiet Mac app: the box art carries the colour, the chrome stays monochrome with one accent. Reference points are Finder icon view, Photos and Music, not a game launcher skin.
 
 1. **Artwork is the only saturated content.** Chrome uses system text colours, system materials and the app accent for interaction only. System colours appear as small identity signals, never as large fills. ESSENTIAL
 2. **The shelf is the signature.** Box art already sits on a common bottom baseline inside a square slot (`GameGridView.swift:175`). Make that the recognisable trait: aligned baselines, varied box shapes, no card backgrounds behind them. RECOMMENDED
@@ -35,7 +35,7 @@ The three-column structure stays: sidebar, grid, inspector, with a unified toolb
 | Content | flexible, ≥ 440 pt target | Window background, no material | System header, grid, empty states |
 | Inspector | 280–400 pt, ideal 320 | System inspector background | Selected game detail, actions, core override |
 
-- Keep the window minimum at 820 × 520 pt and the default at 1240 × 800 pt (`UrsprungApp.swift:56`). The narrow-width problem is solved by column priorities (section M), not by a larger minimum. ESSENTIAL
+- Keep the window minimum at 820 × 520 pt and the default at 1240 × 800 pt (`AtriumApp.swift:56`). The narrow-width problem is solved by column priorities (section M), not by a larger minimum. ESSENTIAL
 - Content priority when width runs out: grid first, then sidebar, then inspector. The inspector is contextual and is the first column to yield. ESSENTIAL
 - The content column never gets its own background colour or material; the grid sits directly on the window background so artwork reads against a neutral field in Light and Dark Mode. ESSENTIAL
 - Background activity (scan, metadata, system media, errors) has exactly one home: the sidebar footer, mirrored into a toolbar popover only when the sidebar is hidden (sections C and D). ESSENTIAL
@@ -274,9 +274,9 @@ Every state uses one of four presentations, chosen by scope: a full-area `Conten
 
 | State | Symbol | Title | Description | Actions | Label |
 | --- | --- | --- | --- | --- | --- |
-| No library folders | `gamecontroller` | Welcome to Ursprung | Add a folder with your games. Ursprung detects the system and fetches covers from ScreenScraper. | **Add Folder…** (`.glassProminent`, large) | ESSENTIAL |
+| No library folders | `gamecontroller` | Welcome to Atrium | Add a folder with your games. Atrium detects the system and fetches covers from ScreenScraper. | **Add Folder…** (`.glassProminent`, large) | ESSENTIAL |
 | Scanning, no games yet | small `ProgressView` | Scanning Library… | “42 games found” when known | — | ESSENTIAL |
-| Scan finished, 0 games | `questionmark.folder` | No Games Found | Ursprung didn't recognise any games in your library folders. | **Rescan**, Library Folders… | ESSENTIAL |
+| Scan finished, 0 games | `questionmark.folder` | No Games Found | Atrium didn't recognise any games in your library folders. | **Rescan**, Library Folders… | ESSENTIAL |
 | No search results | system `.search` | No Results for “query” | Check the spelling or try a new search. | Search All Games (if not in All Games) | ESSENTIAL |
 | Favorites empty | `heart` | No Favorites Yet | Mark a game as favorite in its info panel or context menu. | — | ESSENTIAL |
 | Recently Played empty | `clock` | Nothing Played Yet | Games you play appear here. | — | ESSENTIAL |
@@ -406,7 +406,7 @@ The native Settings scene with toolbar tabs and grouped forms stays; the redesig
 **Window**
 
 - Keep `Settings { TabView { Tab … } }` with the six tabs in their current order. ESSENTIAL
-- Width 700 pt fixed; height ideal 560 pt, min 440 pt, resizable vertically. Today the frame is fixed at 720 × 560 (`UrsprungApp.swift:83`), which clips long tabs like Controls and BIOS. RECOMMENDED
+- Width 700 pt fixed; height ideal 560 pt, min 440 pt, resizable vertically. Today the frame is fixed at 720 × 560 (`AtriumApp.swift:83`), which clips long tabs like Controls and BIOS. RECOMMENDED
 - Metadata tab symbol: `text.below.photo` instead of `sparkles`, which reads as AI. RECOMMENDED
 
 **Rules**
@@ -626,7 +626,7 @@ Colour comes from the existing `AccentColor` asset and native semantic colours; 
 
 ## Q. Proposed design tokens
 
-Three small namespaces in one file, `Ursprung/UI/Components/DesignTokens.swift`: `AppSpacing`, `AppMetrics`, `AppAnimation`. Everything else stays SwiftUI-native. ESSENTIAL
+Three small namespaces in one file, `Atrium/UI/Components/DesignTokens.swift`: `AppSpacing`, `AppMetrics`, `AppAnimation`. Everything else stays SwiftUI-native. ESSENTIAL
 
 **AppSpacing** (4 pt grid)
 
@@ -708,7 +708,7 @@ Seven components earn extraction because each has at least two real hosts today 
 
 ## S. Screen-by-screen implementation order
 
-Ten steps, each a separate commit that builds, keeps all workflows working and can be checked with `URSPRUNG_SNAPSHOT_DIR` snapshots (glass and Metal layers do not appear in snapshots, so those parts need a manual look).
+Ten steps, each a separate commit that builds, keeps all workflows working and can be checked with `ATRIUM_SNAPSHOT_DIR` snapshots (glass and Metal layers do not appear in snapshots, so those parts need a manual look).
 
 1. **Tokens and motion helpers**: `DesignTokens.swift` with `AppSpacing`, `AppMetrics`, `AppAnimation`, `appAnimation`, `appFade`. No visual change yet.
 2. **Game actions**: `GameActions`, used by context menu and inspector; add Remove from Library to the inspector, confirmation dialog, Game menu items. Removes the action inconsistency first because later steps build on it.

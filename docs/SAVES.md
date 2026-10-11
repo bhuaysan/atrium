@@ -1,6 +1,6 @@
 # Saves, game identity and backups
 
-How Ursprung keeps progress safe: where saves live, how a game keeps its
+How Atrium keeps progress safe: where saves live, how a game keeps its
 saves when its file moves, what a save state is compatible with, and what a
 backup contains.
 
@@ -80,8 +80,8 @@ ARMSX2 (PlayStation 2) writes its own state files instead:
     States/<game id>/armsx2/<serial> (<disc CRC>).resume.p2s the automatic state
     States/<game id>/armsx2/<state>.json                     its name, if any
 
-Ursprung's Quick Save is ARMSX2's slot 1 (`.01.p2s`) so that the Quick Save
-key in ARMSX2's window saves into the same state; Ursprung's slot 1 is file
+Atrium's Quick Save is ARMSX2's slot 1 (`.01.p2s`) so that the Quick Save
+key in ARMSX2's window saves into the same state; Atrium's slot 1 is file
 `.00.p2s`. Saving and loading from the library go through ARMSX2's PINE
 socket. A `.p2s` carries ARMSX2's save state version; states from a version
 the installed ARMSX2 can't read are not offered for loading. Every installed
@@ -91,7 +91,7 @@ saves through its own keys don't go into the history.
 
 ### Automatic state
 
-When a game stops (also when Ursprung quits), its state is saved as
+When a game stops (also when Atrium quits), its state is saved as
 `autosave.state` (with `.png` and `.json`) in the core's folder, apart from the
 numbered slots. With Settings › Emulation › Resume Where You Left Off, Play
 continues from it and the game's menu offers Start from Beginning; otherwise
@@ -100,7 +100,7 @@ is also written every 5 minutes. Like a slot, a failed write keeps the
 previous file. Cores that cannot save states have no automatic state.
 
 For PlayStation 2 the automatic state is ARMSX2's `.resume.p2s`, written
-when Ursprung quits the game; quitting in ARMSX2's own window (⌘Q, close
+when Atrium quits the game; quitting in ARMSX2's own window (⌘Q, close
 button) writes none, and the older one is then deleted so Resume never goes
 back behind the memory card.
 
@@ -154,7 +154,7 @@ ROM's CRC32, file name and size, and the date:
 
 A save state is a memory snapshot in a core-specific format. It is generally
 only readable by the same core, and core updates can change the format.
-Ursprung therefore compares the manifest with the running game:
+Atrium therefore compares the manifest with the running game:
 
 | Difference | What happens |
 |---|---|
@@ -185,7 +185,7 @@ larger states) and keeps the differences between them, compressed, in a
 buffer of the size chosen in Settings › Emulation; when it is full, the
 oldest seconds go. Cores without save states, and states over 24 MB, can't
 rewind. If the core can't go back to a recorded state, rewinding stops: the
-game runs forwards again and Ursprung says the core can't rewind it.
+game runs forwards again and Atrium says the core can't rewind it.
 Run-ahead saves and loads a state every frame and is skipped for
 hardware-rendered cores and while fast forwarding.
 
@@ -194,7 +194,7 @@ hardware-rendered cores and while fast forwarding.
 A game's patches (`.ips`, `.ups`, `.bps`) are copied to
 `Extras/<game id>/Patches/`; `patches.json` names the one the game starts
 with. The ROM file is never changed: at launch the patched ROM is written to
-the cache (`~/Library/Caches/Ursprung/Extracted/<game id>-patched/`) and
+the cache (`~/Library/Caches/Atrium/Extracted/<game id>-patched/`) and
 handed to the core. UPS and BPS patches carry the checksum of the ROM they
 expect, so a patch for another revision is refused with a message instead of
 producing a broken game. Disc images and arcade sets can't be patched.
@@ -234,9 +234,10 @@ doesn't allow in hardcore mode turn it off for that game.
 
 File › Back Up Library… (or Settings › General › Data) writes one zip file:
 
-    Ursprung Backup/
-      manifest.json    format "ursprung-backup", version, date, app version,
-                       and every file with its size
+    Atrium Backup/
+      manifest.json    format "atrium-backup", version, date, app version,
+                       and every file with its size ("ursprung-backup"
+                       in backups made before the rename, also accepted)
       library.json     every library entry with its history and metadata
       settings.plist   preferences (library folders, scraper language and
                        region, video, controls and hotkeys for all systems and
@@ -253,7 +254,7 @@ shader pack (offered for download after a restore whose settings use it),
 and the ScreenScraper password and RetroAchievements token, which stay in the keychain.
 
 File › Restore from Backup… first extracts and checks the backup. If it is not
-an Ursprung backup, comes from a newer version, or misses or garbles any file
+an Atrium backup, comes from a newer version, or misses or garbles any file
 its manifest lists, nothing is restored. Otherwise a summary asks for
 confirmation (optionally including settings), and then
 

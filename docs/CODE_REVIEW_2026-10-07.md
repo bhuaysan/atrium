@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-# Re-Review – Ursprung: Fixes zu c36178a
+# Re-Review – Atrium: Fixes zu c36178a
 
 **Datum:** 07.10.2026  
 **Geprüfter Bereich:** `c36178a..2b278e1`  
@@ -17,7 +17,7 @@ Der gezielte Xcode-Testlauf ergab **45 bestanden, zwei übersprungen**. Überspr
 
 ### B1 · P1 · R1: Die Endungsprüfung verhindert weiterhin keinen Zugriff außerhalb des Pakets
 
-**Datei:** [ShaderImport.swift:74](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/ShaderImport.swift#L74)
+**Datei:** [ShaderImport.swift:74](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/ShaderImport.swift#L74)
 
 **Fehlerszenario:** Ein Preset verweist mit `../Private/photo.png` auf eine externe Datei → sie wird ohne Warnung importiert. Noch deutlicher: Eine Texturreferenz auf einen **Ordner** `../Private/folder.png` → `copyItem` kopiert diesen rekursiv, einschließlich `notes.txt`. Beide Fälle sind reproduziert.
 
@@ -29,7 +29,7 @@ Die Allowlist ist deshalb kein ausreichender Schutz für R1. Erforderlich sind e
 
 ### B2 · P1 · #3: Die Kollisionsprüfung übersieht unveränderte Dateien und Dateisystem-Aliase
 
-**Datei:** [ShaderDrafts.swift:204](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/ShaderDrafts.swift#L204), [ShaderDrafts.swift:237](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/ShaderDrafts.swift#L237)
+**Datei:** [ShaderDrafts.swift:204](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/ShaderDrafts.swift#L204), [ShaderDrafts.swift:237](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/ShaderDrafts.swift#L237)
 
 Zwei reproduzierte Fehlerwege:
 
@@ -42,7 +42,7 @@ Der vorhandene Regressionstest deckt ausschließlich die exakte Namenskollision 
 
 ### B3 · P2 · #7: Alte Drafts können Änderungen in eine andere Datei schreiben als diejenige, die der Pass verwendet
 
-**Dateien:** [ShaderDrafts.swift:139](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/ShaderDrafts.swift#L139), [ShaderEditor.swift:614](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/ShaderEditor.swift#L614)
+**Dateien:** [ShaderDrafts.swift:139](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/ShaderDrafts.swift#L139), [ShaderEditor.swift:614](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/ShaderEditor.swift#L614)
 
 **Fehlerszenario:** Ein alter Draft enthält bereits `other/<hash>/a.slang`. Ein weiterer Pass wird aus derselben externen Originaldatei übernommen → `ownCopy` erzeugt zusätzlich die neue Kopie unter dem absoluten Pfad. Der Pass erhält diese neue Kopie; `ownURL` findet über `first` dagegen den alten Herkunftseintrag.
 
@@ -54,7 +54,7 @@ Die doppelte Herkunftszuordnung und die unterschiedlichen Zielpfade sind reprodu
 
 ### B4 · P2 · #7: Includes über die Grenze zwischen user/, library/ und other/ bleiben defekt
 
-**Datei:** [ShaderDrafts.swift:156](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/ShaderDrafts.swift#L156)
+**Datei:** [ShaderDrafts.swift:156](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/ShaderDrafts.swift#L156)
 
 **Fehlerszenario:** `User/cross.slang` enthält `#include "../shared.h"`, wobei `shared.h` außerhalb von `User` liegt → beide Dateien werden kopiert, aber in verschiedene Namensräume verschoben. Der unveränderte Include-Pfad erreicht die Kopie nicht.
 
@@ -66,7 +66,7 @@ Für ausschließlich externe Dateien funktioniert der Fix. Als allgemeine Lösun
 
 ### B5 · P2 · #2: History-, Legacy- und Autosave-Löschungen verschlucken weiterhin Fehler
 
-**Datei:** [SaveStates.swift:166](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/SaveStates.swift#L166)
+**Datei:** [SaveStates.swift:166](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/SaveStates.swift#L166)
 
 **Fehlerszenario:** Einen History-Spielstand in einem nicht beschreibbaren Verzeichnis löschen → `discard` ruft weiterhin das nicht werfende `delete` mit `try?` auf. Die Datei bleibt bestehen, aber der Aufrufer erhält keinen Fehler; die neue Fehlermeldung erscheint nicht.
 
@@ -76,7 +76,7 @@ Genau dieser Fall wurde reproduziert. Der gefährliche Fallback „Archivierung 
 
 ### B6 · P2 · R3: Nach einem Restore-Fehler läuft das Spiel vorwärts, während UI und Shader weiterhin Rewind verwenden
 
-**Datei:** [UREmulationRunner.m:318](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Bridge/UREmulationRunner.m#L318)
+**Datei:** [UREmulationRunner.m:318](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Bridge/UREmulationRunner.m#L318)
 
 **Fehlerszenario:** Rewind-Taste halten, dann schlägt `unserialize` fehl → der Buffer wird freigegeben. Im nächsten Schleifendurchlauf läuft wegen `_rewind == NULL` wieder `runVisibleFrame`.
 
@@ -88,7 +88,7 @@ Der neue Test ruft `stepBack` direkt auf und prüft weder den folgenden Schleife
 
 ### B7 · P2 · Compile-Ergebnisse werden bei geändertem Core-/Rotationskontext weiterhin akzeptiert
 
-**Datei:** [MetalRenderer.swift:73](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/MetalRenderer.swift#L73), [MetalRenderer.swift:385](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Emulation/MetalRenderer.swift#L385)
+**Datei:** [MetalRenderer.swift:73](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/MetalRenderer.swift#L73), [MetalRenderer.swift:385](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Emulation/MetalRenderer.swift#L385)
 
 **Fehlerszenario:** Eine Kompilierung beginnt mit Core A beziehungsweise Rotation 0. Währenddessen wechselt die Quelle oder deren Rotation; das Preset bleibt gleich → `compileGeneration` bleibt unverändert. Das Ergebnis für den alten Kontext wird übernommen.
 
@@ -98,7 +98,7 @@ Bei Presets mit `$CORE$` oder `$CORE-REQ-ROT$` kann damit die falsche Variante a
 
 ### B8 · P2 · #9: Mehrere Backup-Einträge für dasselbe Zielspiel haben keine deterministische Einstellungspriorität
 
-**Dateien:** [Preferences.swift:241](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Support/Preferences.swift#L241), [Backup.swift:301](https://github.com/bhuaysan/ursprung/blob/2b278e1/Ursprung/Support/Backup.swift#L301)
+**Dateien:** [Preferences.swift:241](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Support/Preferences.swift#L241), [Backup.swift:301](https://github.com/bhuaysan/atrium/blob/2b278e1/Atrium/Support/Backup.swift#L301)
 
 **Fehlerszenario:** Zwei Backup-Spiel-IDs werden vom Plan demselben vorhandenen Spiel zugeordnet und enthalten unterschiedliche Shader-Einstellungen → beide schreiben denselben Preference-Key. Es gewinnt die nicht festgelegte Dictionary-Reihenfolge.
 
@@ -165,7 +165,7 @@ Die folgende Altcode-Bewertung stammt aus dem Vergleich der Implementierungen; e
 | ID | Status | Umsetzung | Test |
 |---|---|---|---|
 | B1 | behoben | Feste Paketgrenze für einzelne Presets: der tiefste Ordner, der das Preset, seine `#reference`-Presets und deren Shader-Passes enthält (`ShaderImport.package(of:)`). Ist das der Benutzerordner, ein Ordner darüber oder ein ganzes Volume, wird der Import mit Hinweis abgelehnt. Die Grenze steht fest, bevor Includes und Texturen gelesen werden: Dateien außerhalb werden weder gelesen noch verfolgt (`SlangPresetFile.dependencies(of:within:)`); zum Bestimmen der Grenze werden nur `.slangp`-Dateien gelesen. Links werden vor der Prüfung aufgelöst, kopiert werden nur reguläre Dateien (der Inhalt, nicht der Link), also auch kein Ordner `folder.png`. Ordnerimporte kopieren Datei für Datei: Links auf reguläre Dateien im Ordner werden zu Kopien, Links aus dem Ordner hinaus bleiben zurück und werden gemeldet. | `importStaysInsideThePresetsPackage` (Foto, Ordner `folder.png`, Link aus dem Paket, Include außerhalb), `aPackageMayNotBeTheHomeFolderOrAVolume`, `importedFoldersKeepNoLinksOutOfThem`, angepasst `importLeavesFilesBehindThatArentShadersOrImages` |
-| B2 | behoben | Alle Dateien, die das gespeicherte Preset liest und die keine eigenen Kopien des Drafts sind (unveränderte Passes samt Includes, Texturen), gelten als belegt; eine eigene Kopie darf dort nicht landen und weicht ins Layout mit erstem Ordner (`library/…`) aus, sonst bricht das Speichern ab. Pfade werden wie auf APFS verglichen: ohne Groß-/Kleinschreibung und Unicode-Form. Rückschreiben an den Ursprung beim Speichern an Ort und Stelle bleibt erlaubt. | `savingKeepsOffFilesOtherPassesUse`, `savingTellsApartNamesThatDifferInCaseOnly` (beide scheitern mit dem alten Code) |
+| B2 | behoben | Alle Dateien, die das gespeicherte Preset liest und die keine eigenen Kopien des Drafts sind (unveränderte Passes samt Includes, Texturen), gelten als belegt; eine eigene Kopie darf dort nicht landen und weicht ins Layout mit erstem Ordner (`library/…`) aus, sonst bricht das Speichern ab. Pfade werden wie auf APFS verglichen: ohne Groß-/Kleinschreibung und Unicode-Form. Rückschreiben an den Atrium beim Speichern an Ort und Stelle bleibt erlaubt. | `savingKeepsOffFilesOtherPassesUse`, `savingTellsApartNamesThatDifferInCaseOnly` (beide scheitern mit dem alten Code) |
 
 
 Validierung B1/B2: `xcodebuild … test` mit 447 Tests grün, 2 übersprungen (Shader-Pack).

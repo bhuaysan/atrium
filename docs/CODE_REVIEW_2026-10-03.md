@@ -1,4 +1,4 @@
-# Re-Review – Ursprung
+# Re-Review – Atrium
 
 **Datum:** 03.10.2026  
 **Geprüfter Stand:** `dd0c6c65cb874e0e22e8ccca5c045628c3986e15` (`main`)  
@@ -46,7 +46,7 @@ Die vorhandene Testsuite besteht mit **128 Tests / 154 Testfällen einschließli
 
 ### R1 · [P1] Inhaltslesefehler einer ZIP-Datei führen weiterhin zu Datenverlust
 
-**Fundstellen:** [LibraryScanner.swift:138](<../Ursprung/Library/LibraryScanner.swift:138>), [LibraryScanner.swift:98](<../Ursprung/Library/LibraryScanner.swift:98>) und [LibraryStore.swift:147](<../Ursprung/Library/LibraryStore.swift:147>).
+**Fundstellen:** [LibraryScanner.swift:138](<../Atrium/Library/LibraryScanner.swift:138>), [LibraryScanner.swift:98](<../Atrium/Library/LibraryScanner.swift:98>) und [LibraryStore.swift:147](<../Atrium/Library/LibraryStore.swift:147>).
 
 **Auslöser:** Eine bereits erkannte `Game.zip` liegt in einem Bibliotheksordner ohne erkennbaren Systemnamen. Das System wird deshalb aus dem Archivinhalt bestimmt. Anschließend wird nur die ZIP-Datei unlesbar, während das Verzeichnis weiterhin aufgelistet werden kann.
 
@@ -69,7 +69,7 @@ Beobachtet wurde `LibraryScan(roms: [], unreadable: [])`. Der vorhandene Datensa
 
 ### R2 · [P2] Der verzögerte Audio-Clear kann das Vorpuffern dauerhaft blockieren
 
-**Fundstellen:** [URAudioRing.c:38](<../Ursprung/Bridge/URAudioRing.c:38>), [URAudioRing.c:49](<../Ursprung/Bridge/URAudioRing.c:49>), [URAudioRing.c:64](<../Ursprung/Bridge/URAudioRing.c:64>) und [UREmulationRunner.m:250](<../Ursprung/Bridge/UREmulationRunner.m:250>).
+**Fundstellen:** [URAudioRing.c:38](<../Atrium/Bridge/URAudioRing.c:38>), [URAudioRing.c:49](<../Atrium/Bridge/URAudioRing.c:49>), [URAudioRing.c:64](<../Atrium/Bridge/URAudioRing.c:64>) und [UREmulationRunner.m:250](<../Atrium/Bridge/UREmulationRunner.m:250>).
 
 **Auslöser:** Während Schnellvorlauf wird der Puffer nach jedem Emulationsframe geleert. Die Audioausgabe befindet sich nach einem Unterlauf oder beim Start im Zustand `primed == false`.
 
@@ -101,7 +101,7 @@ Der identische Ablauf mit der vorherigen Ring-Implementierung erholt sich: `writ
 
 ### R3 · [P2] Der erste Scan von Bestandsdaten versieht eine alte CRC32 mit dem neuen Änderungsdatum
 
-**Fundstellen:** [LibraryStore.swift:127](<../Ursprung/Library/LibraryStore.swift:127>) und [MetadataService.swift:100](<../Ursprung/Metadata/MetadataService.swift:100>).
+**Fundstellen:** [LibraryStore.swift:127](<../Atrium/Library/LibraryStore.swift:127>) und [MetadataService.swift:100](<../Atrium/Metadata/MetadataService.swift:100>).
 
 **Auslöser:** Ein bestehender Bibliothekseintrag besitzt eine CRC32, aber noch kein `fileModified`. Dieses Feld ist neu; bei älteren Datensätzen fehlt die Information. Das ROM wurde seit der damaligen CRC-Berechnung durch ein gleich großes ROM ersetzt, bevor der erste Scan mit der korrigierten Version stattfindet.
 
@@ -115,7 +115,7 @@ Der identische Ablauf mit der vorherigen Ring-Implementierung erholt sich: `writ
 
 ### R4 · [P2] Der CUE-Parser entfernt weiterhin den Unterordner einer Track-Referenz
 
-**Fundstellen:** [LibraryScanner.swift:243](<../Ursprung/Library/LibraryScanner.swift:243>) und [LibraryScanner.swift:182](<../Ursprung/Library/LibraryScanner.swift:182>).
+**Fundstellen:** [LibraryScanner.swift:243](<../Atrium/Library/LibraryScanner.swift:243>) und [LibraryScanner.swift:182](<../Atrium/Library/LibraryScanner.swift:182>).
 
 **Auslöser:** Eine CUE-Datei enthält einen relativen Track-Pfad mit Verzeichniskomponente, zum Beispiel `FILE "Tracks/Track.bin" BINARY`.
 
@@ -168,13 +168,13 @@ Der erste Versuch einer Pixelprüfung der SwiftUI-View lieferte bereits für das
 
 ### Nachvollziehbare lokale Artefakte
 
-Die temporären Belege liegen im Verzeichnis `/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/ursprung-rereview-20261003-u5jn2opc/` und können später vom System entfernt werden. Die wesentlichen Schritte und Resultate sind deshalb oben vollständig beschrieben.
+Die temporären Belege liegen im Verzeichnis `/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/atrium-rereview-20261003-u5jn2opc/` und können später vom System entfernt werden. Die wesentlichen Schritte und Resultate sind deshalb oben vollständig beschrieben.
 
-- [Ergebnis der bestehenden Testsuite](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/ursprung-rereview-20261003-u5jn2opc/baseline-summary.json)
-- [Abschließendes Ergebnis der 14 Zusatztests](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/ursprung-rereview-20261003-u5jn2opc/final-probes-summary.json)
-- [Zusätzliche Re-Review-Tests](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/ursprung-rereview-20261003-u5jn2opc/project/UrsprungTests/ReReviewProbes.swift)
-- [Audio-Reproduktion mit Priming-Bedingung](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/ursprung-rereview-20261003-u5jn2opc/ring-prime-probe.c)
-- [Release-Build-Log](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/ursprung-rereview-20261003-u5jn2opc/release.log)
+- [Ergebnis der bestehenden Testsuite](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/atrium-rereview-20261003-u5jn2opc/baseline-summary.json)
+- [Abschließendes Ergebnis der 14 Zusatztests](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/atrium-rereview-20261003-u5jn2opc/final-probes-summary.json)
+- [Zusätzliche Re-Review-Tests](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/atrium-rereview-20261003-u5jn2opc/project/AtriumTests/ReReviewProbes.swift)
+- [Audio-Reproduktion mit Priming-Bedingung](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/atrium-rereview-20261003-u5jn2opc/ring-prime-probe.c)
+- [Release-Build-Log](/var/folders/81/qfsm_y7s5_db2h31nwjjjmrw0000gn/T/atrium-rereview-20261003-u5jn2opc/release.log)
 
 ### Grenzen der Aussage
 

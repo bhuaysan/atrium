@@ -1,8 +1,8 @@
-# Ursprung — RetroArch Shaders and Shader Editor: Plan
+# Atrium — RetroArch Shaders and Shader Editor: Plan
 
 5 October 2026 · based on commit 164002d (main). Status: all phases done (0 spike, 1 dependency, 2 render path, 3 shader library, 4 player panel, 5 shader editor, 6 polish).
 
-Ursprung renders every frame through one built-in Metal shader (`Ursprung/Emulation/ShaderSource.swift`, 7 fixed filters). This plan adds RetroArch slang shader presets through librashader, and a shader editor with live preview on top of it.
+Atrium renders every frame through one built-in Metal shader (`Atrium/Emulation/ShaderSource.swift`, 7 fixed filters). This plan adds RetroArch slang shader presets through librashader, and a shader editor with live preview on top of it.
 
 ## Decisions
 
@@ -37,7 +37,7 @@ Non-goals: `.glslp`/`.cgp` presets (librashader only reads slang), a node graph 
 - Wildcard context (`libra_preset_ctx_*`): core name, content directory, rotation, aspect orientation. These feed `$CORE$`-style paths in presets. librashader 0.12.0's `libra_preset_create_with_options` ignores the context (it parses with `try_parse`, not `try_parse_with_context`), so `URShaderChain` loads presets that have a wildcard (or reference one that has) with the deprecated `libra_preset_create_with_context`, which applies it but has no options (no original aspect and frame time uniforms).
 - Mipmaps are never generated for the input texture; the chain never renders to the backbuffer itself.
 
-### Ursprung today
+### Atrium today
 
 - `URLibretroCore` converts every core frame (software, or GL readback for hardware cores) to XRGB8888. `MetalRenderer.uploadFrameIfNeeded` copies it into a BGRA8 `MTLTexture` (mipmapped for the ambient light) once per new `frameSerial`.
 - `MetalRenderer.draw` (main thread, `MTKView` at up to 120 Hz) draws ambient light → game quad (rotation, aspect, integer scaling, filter via `Uniforms.filter`) → bezel image.
@@ -79,14 +79,14 @@ Non-goals: `.glslp`/`.cgp` presets (librashader only reads slang), a node graph 
 - `ShaderSelection` (nonisolated, `Sendable`): `.builtin(VideoFilter)` or `.preset(ShaderPresetRef)`. `ShaderPresetRef` is a path relative to the shader root plus a source (`library`, `user`).
 - It is stored in the existing keys: `videoFilter` / `videoFilter.<systemID>` keep the `VideoFilter` raw values, and presets are stored as `preset:<source>/<relative path>`. Old values stay valid; there is no migration.
 - Per-game override: `videoFilter.game.<uuid>`. Resolution order: game → system → all systems (extends `VideoFilter.current(for:)`). The existing `videoFilter.` backup prefix covers it, and game IDs are stable since M1. Removing a game removes its key.
-- `SlangPreset`: Ursprung's own `.slangp` parser and serializer (passes, all pass keys, aliases, textures, parameter overrides, `#reference`). Its only purpose is editing; runtime loading always goes through librashader.
+- `SlangPreset`: Atrium's own `.slangp` parser and serializer (passes, all pass keys, aliases, textures, parameter overrides, `#reference`). Its only purpose is editing; runtime loading always goes through librashader.
 - No SwiftData change: everything lives in prefs and files, and LibrarySchemaV4 stays frozen.
 
 ### Files
 
 ```
-Application Support/Ursprung/Shaders/
-  slang-shaders/      downloaded pack, read-only for Ursprung, replaced on update
+Application Support/Atrium/Shaders/
+  slang-shaders/      downloaded pack, read-only for Atrium, replaced on update
   User/               user presets and edited shaders (part of the backup)
   Drafts/<uuid>/      editor working copies (autosaved, not backed up)
 Extras/<game-id>/ShaderFrames/   native-resolution frames captured for the editor
@@ -100,7 +100,7 @@ Effort as in FEATURE_EVALUATION: S = local change, M = several components, L = n
 
 ### Phase 0 — Spike (S, throwaway branch)
 
-Link the prebuilt dylib into `ursprung-smoke` and add `--shader <preset.slangp>`. It renders the smoke frame through librashader on Metal and writes `smoke.png`. Use it to answer:
+Link the prebuilt dylib into `atrium-smoke` and add `--shader <preset.slangp>`. It renders the smoke frame through librashader on Metal and writes `smoke.png`. Use it to answer:
 
 - **S1** Is a chain created on a background thread safe to use on the main thread? How long do `crt-royale`, `crt-guest-advanced` and Mega Bezel take to compile?
 - **S2** What do compile errors look like? Do they include file and line, and how do `#include` files show up?
@@ -111,7 +111,7 @@ Link the prebuilt dylib into `ursprung-smoke` and add `--shader <preset.slangp>`
 
 #### Spike results (5 October 2026)
 
-The spike ran as a standalone Objective-C program in a scratch folder instead of `ursprung-smoke`. It used librashader 0.12.0 (prebuilt aarch64 dylib) and the libretro pack (2,658 `.slangp`, 81 MB unpacked). The input was a 256×224 BGRA8 test pattern; the output was 1920×1080 BGRA8. Output was correct and upright: masks and scanlines visible, no Y flip needed.
+The spike ran as a standalone Objective-C program in a scratch folder instead of `atrium-smoke`. It used librashader 0.12.0 (prebuilt aarch64 dylib) and the libretro pack (2,658 `.slangp`, 81 MB unpacked). The input was a 256×224 BGRA8 test pattern; the output was 1920×1080 BGRA8. Output was correct and upright: masks and scanlines visible, no Y flip needed.
 
 | Preset | Passes | Compile, cold | Compile, warm | Frame (1080p, incl. GPU wait) |
 |---|---|---|---|---|
@@ -125,7 +125,7 @@ The spike ran as a standalone Objective-C program in a scratch folder instead of
 - **S2 Errors**: glslang errors come back as `errno=6` with a Rust debug string containing `ERROR: <file name>:<line>: <message>`. The line is already mapped into `#include` files. Only the file's base name is given, not its path. Missing includes are `errno=4` with the absolute path. Preset errors are `errno=3` with a typed reason (e.g. `InvalidScaleType("nonsense")`) but no line number. The editor parses `ERROR: (.+?):(\d+): (.*)` and resolves the base name against the pass's include graph. Shader errors appear only when the chain is created, not when the preset is parsed. The editor must compile to validate, which takes ~50 ms for small shaders.
 - **S3 `#reference`**: works, including multi-level Mega Bezel references. Parameter overrides in a referencing preset are reported as `initial` by `get_runtime_params`. "Reset to default" therefore needs the shader's own `#pragma parameter` value, which the editor reads itself. `set_param` changes a value live, and an unknown name returns `errno=5`.
 - **S4 Output**: the final pass clears the **whole** output texture to transparent black (alpha 0), including the area outside the viewport. Inside the viewport, alpha is often 0 as well. This confirms the offscreen-texture design (drawing straight into the drawable would erase the ambient light), and the compositing pass must ignore alpha. The viewport origin is honoured.
-- **S5 Cache**: the Metal runtime has no librashader cache (`filter_chain_mtl_opt_t` only has `force_no_mipmaps`). The cold/warm difference comes from the macOS Metal compiler cache (`$(getconf DARWIN_USER_CACHE_DIR)/com.apple.metal`). Ursprung needs no cache location of its own. Cold compiles of big presets need a progress indicator.
+- **S5 Cache**: the Metal runtime has no librashader cache (`filter_chain_mtl_opt_t` only has `force_no_mipmaps`). The cold/warm difference comes from the macOS Metal compiler cache (`$(getconf DARWIN_USER_CACHE_DIR)/com.apple.metal`). Atrium needs no cache location of its own. Cold compiles of big presets need a progress indicator.
 - **S6 Indexing**: `libra_preset_create_with_options` plus `get_runtime_params` parses without compiling in 0–2 ms (it reads the shader files for their pragmas). Mega Bezel reports **947 parameters**, so the parameter UI needs search, grouping (descriptions use indentation and header-like entries) and virtualised lists.
 - **Other findings**:
   - The prebuilt dylib's install name is the CI build path (`/Users/runner/work/…/liblibrashader_capi.dylib`), so `install_name_tool -id @rpath/librashader.dylib` is required.
@@ -165,13 +165,13 @@ The spike ran as a standalone Objective-C program in a scratch folder instead of
 - `MetalRenderer`: `PresentationLayout` (pure, tested) places the picture on whole pixels, and the vertex shader got an `offset` uniform for it, so the chain output maps 1:1. The chain pass runs only when a new frame, a new output size or a new chain arrives. `frameCount` is the core's `frameSerial`, `frame_direction` is -1 while rewinding, and frame time and FPS feed the frametime uniforms.
 - **No history clearing.** librashader 0.12.0 (also on master) clears the frame history in a render pass with one colour attachment per history texture. For presets without history the pass has no attachments: `frame` fails with `FailedToCreateCommandBuffer`, and under Metal API validation it is an assertion. The C API does not say whether a preset has history, so `clear_history` is never set and the session sends no history-clear events. After a state load or reset, history effects (motion blur, phosphor persistence) blend a few old frames. Revisit when `SlangPreset` (phase 5) can tell whether a preset uses `OriginalHistory`/feedback, or when upstream fixes it.
 - librashader's `*_free` functions panic (and print) on null handles, although the header says they do nothing; the bridge only frees non-null handles.
-- Verified: `ursprung-smoke` with `URSMOKE_SHADER=<preset>` (and `URSMOKE_SHADER_HEIGHT`) rendered crt-royale (NES), crt-guest-advanced (SNES), lcd-grid-v2 (GBA), zfast-crt (PSX, Swanstation hardware) and crt-easymode (N64, GLideN64). In the app: crt-royale with integer scaling and ambient light, a live switch to an LCD preset, the missing-file fallback with its toast, and crt-guest-advanced while rewinding, all at 60 fps. Rotation is covered by `PresentationLayoutTests` only; no vertical game was at hand.
+- Verified: `atrium-smoke` with `URSMOKE_SHADER=<preset>` (and `URSMOKE_SHADER_HEIGHT`) rendered crt-royale (NES), crt-guest-advanced (SNES), lcd-grid-v2 (GBA), zfast-crt (PSX, Swanstation hardware) and crt-easymode (N64, GLideN64). In the app: crt-royale with integer scaling and ambient light, a live switch to an LCD preset, the missing-file fallback with its toast, and crt-guest-advanced while rewinding, all at 60 fps. Rotation is covered by `PresentationLayoutTests` only; no vertical game was at hand.
 - CI: `ShaderChainTests` render a fixture preset on the GPU and check pixels, parameter changes and compile errors. `make test`: 276 tests green.
 - Prefs written from outside the app (`defaults write videoFilter.<system>`) only reach a running player when an `@AppStorage` key changes too; `UserDefaults.didChangeNotification` is in-process only. Settings changes made in the app are not affected.
 
 ### Phase 3 — Shader library (M)
 
-- `ShaderLibrary` (`@Observable`, injected in `UrsprungApp`):
+- `ShaderLibrary` (`@Observable`, injected in `AtriumApp`):
   - download `https://buildbot.libretro.com/assets/frontend/shaders_slang.zip` (~54 MB) with progress, unpack atomically (staging folder, then move), and run the update check via `Last-Modified` like `CoreManager`;
   - index all `.slangp` files: category = top folder (crt, handheld, scanlines, …), name, parameter count, pass count;
   - user folder, import via file picker, drag and drop of `.slangp`/folders, favorites.
@@ -187,7 +187,7 @@ The spike ran as a standalone Objective-C program in a scratch folder instead of
 - UI: `ShaderPicker` replaces the filter pickers in Settings › Emulation (all systems and per system): built-in filters, favourites, the selected preset and "RetroArch Shaders…", which opens `ShaderBrowser` (categories, favourites, My Shaders, search, pass counts with a warning colour from 20 passes). The browser opens in the current preset's category and scrolls to it. Settings › Emulation has a "RetroArch Shaders" section for the pack (download, check for updates, download again, remove) and the user folder. Favourites are a backed-up pref (`shaderFavorites`).
 - Backup: `DataLocations.shaders` = `Shaders/User/`, written as `Shaders/` and restored like bezel images (only missing files). After a restore with settings that name pack presets, the app offers to download the pack.
 - SwiftUI's outline-based `List` crashes (`ViewListTree.visitItem`) when `ScrollViewReader.scrollTo` runs while the list's data is being replaced, e.g. right as the sheet opens and the index refreshes. The browser scrolls only after the index is done, and the library only republishes the preset list when it changed.
-- Tests: `SlangPresetFileTests`, `ShaderLibraryTests` (index, cache, install/update/remove with a fake download, import, favourites) and an opt-in run against the real pack (`TEST_RUNNER_URSPRUNG_SHADER_PACK=<zip> make test`). Verified in the app: download from the buildbot, browser, favourites in the menus, per-system choice, update check.
+- Tests: `SlangPresetFileTests`, `ShaderLibraryTests` (index, cache, install/update/remove with a fake download, import, favourites) and an opt-in run against the real pack (`TEST_RUNNER_ATRIUM_SHADER_PACK=<zip> make test`). Verified in the app: download from the buildbot, browser, favourites in the menus, per-system choice, update check.
 
 ### Phase 4 — Player shader panel (M)
 
@@ -265,14 +265,14 @@ If a game starts while the editor is open, the editor switches to live preview; 
   - all of this works without a running game.
 
 **Done 6 October 2026.**
-- Model: `SlangPreset` reads and writes every pass, texture and value key (unknown keys are kept; comments are not). `SlangPreset.load` resolves `#reference` chains into one preset with absolute paths, fills RetroArch wildcards in referenced paths (falling back to the literal path, like RetroArch) and resolves texture paths that Mega Bezel's `.params` files set for names declared elsewhere. The opt-in round trip over the pack (`TEST_RUNNER_URSPRUNG_SHADER_PACK=<zip>`) writes every resolved preset next to its original and compares librashader's parameters: 2,626 presets checked, no differences. Presets with a line without `=` (patchy-ntsc) are skipped: librashader then also drops the next line.
+- Model: `SlangPreset` reads and writes every pass, texture and value key (unknown keys are kept; comments are not). `SlangPreset.load` resolves `#reference` chains into one preset with absolute paths, fills RetroArch wildcards in referenced paths (falling back to the literal path, like RetroArch) and resolves texture paths that Mega Bezel's `.params` files set for names declared elsewhere. The opt-in round trip over the pack (`TEST_RUNNER_ATRIUM_SHADER_PACK=<zip>`) writes every resolved preset next to its original and compares librashader's parameters: 2,626 presets checked, no differences. Presets with a line without `=` (patchy-ntsc) are skipped: librashader then also drops the next line.
 - `SlangSource` reads `#pragma parameter` lines (the shader's own defaults), `#include` closures and glslang's `ERROR: file:line: message` lines; `SlangTokenizer` colours slang.
 - Drafts (`ShaderDrafts`): `Shaders/Drafts/<id>/` with `draft.json`, `preset.slangp` and `files/`. The first change to a pack or user file copies the pass shader with all its includes into `files/library/…` or `files/user/…` (shared includes once), so relative includes keep working; a shader whose includes aren't all in the pack or all in the user's folder goes with them below `files/other/` by whole path. `ownCopies` tells which copy a pass reads (older drafts may hold several of one file); the pack is never written. Save never places an own file on a file another pass reads unchanged, comparing paths as case-insensitive volumes do. Save writes `User/<name>.slangp` and the draft's own files into `User/<name>/`; saving over the user preset the draft came from writes copies of user files back. After saving, the editor continues on the saved preset. Export copies the preset with every file it reads into a folder that works on its own (zip via `NSFileCoordinator`'s `.forUploading`). Only the current draft is kept.
 - Renderer: `FrameSource` (the core or a `StillFrame`), so the editor's own `MTKView` uses the same `MetalRenderer`. A recompile of the preset that is showing keeps the previous chain when it fails (`ShaderWorkspace.compileError`). Preview tools in `ShaderWorkspace.previewTools`: split comparison (scissored second draw of the unprocessed frame), zoom 1–8× around a draggable focus (instead of a loupe that follows the pointer), output sizes 1080p/1440p/4K (rendered at that size and scaled into the view), GPU time from the chain's command buffer.
 - **"Show output after pass N" does not use `set_active_pass_count`**: with crt-royale it makes librashader 0.12.0 panic in the next `frame` (index out of bounds in `framebuffer.rs`), which aborts the app. The editor writes `preview-<N>.slangp` with the first N passes next to the draft and compiles that.
 - `EmulationRunner.stepFrame()` runs one frame while paused (no sound) for the editor's Next Frame.
 - Editor window (`WindowID.shaderEditor`): passes in the sidebar (add from a preset or a template pass, duplicate, remove, reorder), the preview above the source, inspector pages Pass / Parameters (grouped by the pass that declares them, in declaration order; librashader's own list is unordered) / Textures. Source editor: TextKit 2 `NSTextView` per open tab (own undo), find bar, line-number ruler with error marks, error lines highlighted, recompile 400 ms after the last keystroke, error list that jumps to the line. With a game running, the player shows the draft (`ShaderWorkspace.editorPreset`) and the tools apply there.
-- Entry points: Window › Shader Editor (⌥⌘E), the player's shader panel ("Open in Shader Editor"), Settings › Emulation, the Edit Shader… item of games and of systems in the sidebar (a game's captured frames become the still picture), pause menu "Capture Frame for Shader Editor" (`Extras/<game>/ShaderFrames/`, aspect ratio in the PNG description). ⌘S saves while the editor is the key window. Debug builds: `URSPRUNG_SHADER_EDITOR=<preset:library/…|preset:user/…|system id|new>`.
+- Entry points: Window › Shader Editor (⌥⌘E), the player's shader panel ("Open in Shader Editor"), Settings › Emulation, the Edit Shader… item of games and of systems in the sidebar (a game's captured frames become the still picture), pause menu "Capture Frame for Shader Editor" (`Extras/<game>/ShaderFrames/`, aspect ratio in the PNG description). ⌘S saves while the editor is the key window. Debug builds: `ATRIUM_SHADER_EDITOR=<preset:library/…|preset:user/…|system id|new>`.
 - AppKit traps: a `VSplitView` in the detail column sent AppKit into an endless constraint update loop (the preview bar's minimum width changes); the editor uses its own draggable split and a horizontally scrolling preview bar. `NSRulerView` subclasses don't clip their drawing (macOS 14+): the ruler painted its background over the text until it clipped to its bounds.
 - Verified in the app: new shader, live recompile, syntax error inline while the last picture stays, crt-royale opened from the pack (12 passes, textures), copy on first edit, Save as "Royale Test" (file layout checked), parameters, live mode on Super Mario Bros. with compare and "up to pass 1". Not verified with real input: dragging the split divider and the zoom focus, Use For, export, adding passes from the browser. `make test`: 315 tests.
 
@@ -282,14 +282,14 @@ If a game starts while the editor is open, the editor switches to live preview; 
 - The player's shader panel lists parameters in librashader's order, which can differ from the declaration order (crt-royale); sort them like the editor does.
 - Performance warning when GPU time exceeds the frame budget.
 - Docs: README feature list, ARCHITECTURE.md (render path, ShaderLibrary), a user-facing shader doc.
-- `debug-without-ui` additions: `URSPRUNG_SHADER=<preset>`, `URSPRUNG_SHADER_PARAMS=…`, and a snapshot of the shader editor.
+- `debug-without-ui` additions: `ATRIUM_SHADER=<preset>`, `ATRIUM_SHADER_PARAMS=…`, and a snapshot of the shader editor.
 
 **Done 6 October 2026.**
 - Localization: an `xcodebuild -exportLocalizations` run showed every shader string translated; the four new strings of this phase have German too. Accessibility: the editor's pass rows read as one element, icon-only marks (edited, not in preview, errors, GPU warning) have labels, decorative symbols are hidden, and the divider between preview and source is an adjustable element ("Preview Height").
 - Parameter order: librashader lists parameters in an order of its own (crt-royale starts with `bloom_*`). `SlangSource.declarationOrder` reads the `#pragma parameter` lines pass by pass (each pass's file, then its includes); the renderer sorts the compiled chain's parameters by it on the compile task, so the panel and the editor's parameter list see the shaders' order. Names the files don't declare keep librashader's order at the end.
 - Performance warning: the renderer passes the frame budget (`1 / fps` of the source) with every GPU time. `ShaderWorkspace.isTooSlow` turns on after two half-second averages over the budget and off after two within it. The panel shows "Too demanding for this Mac" with the times, the editor's GPU time turns orange with a warning symbol and the times in its help, and the player shows one toast per preset and app run (not while the editor previews on the game). Mega Bezel (SMOOTH-ADV-GLASS) on Super Mario Bros. in a 1024×768 window measured about 13 ms against 16.6 ms, so it doesn't warn there.
 - Docs: `docs/SHADERS.md` (user guide), README feature list and data table, an ARCHITECTURE.md *Shaders* section.
-- Debug builds: `URSPRUNG_SHADER=<filter|preset:…>` replaces the player's choice (the panel still shows the stored one), `URSPRUNG_SHADER_PARAMS=NAME=value,…` sets parameters of every preset that loads; with `URSPRUNG_SNAPSHOT_DIR`, the renderer writes the preset's output as `shader-output.png` (player) and `shader-editor-preview.png` (editor still preview) every two seconds, and `session.txt` adds status, GPU time, budget, `tooSlow` and the first parameters.
+- Debug builds: `ATRIUM_SHADER=<filter|preset:…>` replaces the player's choice (the panel still shows the stored one), `ATRIUM_SHADER_PARAMS=NAME=value,…` sets parameters of every preset that loads; with `ATRIUM_SNAPSHOT_DIR`, the renderer writes the preset's output as `shader-output.png` (player) and `shader-editor-preview.png` (editor still preview) every two seconds, and `session.txt` adds status, GPU time, budget, `tooSlow` and the first parameters.
 - Verified in the app: crt-royale on Super Mario Bros. with two parameters set from the environment (`session.txt` and the panel list the parameters in declaration order, `shader-output.png` shows the mask); with the budget divided by four in a temporary patch, the German toast and the panel's warning appeared; the editor's still preview snapshot. Not verified: the editor's orange GPU label (crt-royale stays under the budget in the small preview) and VoiceOver itself. `make test`: 317 tests.
 
 ## Tests
@@ -300,7 +300,7 @@ If a game starts while the editor is open, the editor switches to live preview; 
 - Backup: `Shaders/User/` round trip; a removed game loses its `videoFilter.game.` key.
 - `ShaderLibrary`: index, update replacement (staging), import, copy-on-write.
 - Renderer: offscreen size and viewport math (pure functions extracted from `makeUniforms`).
-- Smoke: `ursprung-smoke --shader` renders a fixture preset; pixel checks in CI (runners have Metal).
+- Smoke: `atrium-smoke --shader` renders a fixture preset; pixel checks in CI (runners have Metal).
 
 ## Risks
 
@@ -313,7 +313,7 @@ If a game starts while the editor is open, the editor switches to live preview; 
 | Huge parameter lists (947 in Mega Bezel) | Search, grouping, lazy lists in panel and editor |
 | Upstream API/ABI changes | Pin the version and its checksum; update deliberately via the README steps |
 | Shaders written for RetroArch quirks fail in librashader (stricter parser) | Show the error, fall back; list known-incompatible presets in the browser |
-| Pack licences vary per shader | Ursprung does not redistribute the pack: users download it from libretro |
+| Pack licences vary per shader | Atrium does not redistribute the pack: users download it from libretro |
 | Dylib size (+ ~25 MB unpacked) | Acceptable; check app size in `make dist` |
 
 ## Resolved questions (5 October 2026)

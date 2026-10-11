@@ -1,6 +1,6 @@
 # Architecture
 
-Ursprung is a SwiftUI app with a small Objective-C/C libretro host. The only
+Atrium is a SwiftUI app with a small Objective-C/C libretro host. The only
 third-party code is [rcheevos](https://github.com/RetroAchievements/rcheevos)
 (MIT) in `ThirdParty/rcheevos`, compiled into the app for RetroAchievements,
 and [librashader](https://github.com/SnowflakePowered/librashader)
@@ -41,19 +41,19 @@ and [librashader](https://github.com/SnowflakePowered/librashader)
 
 | Path | Purpose |
 |---|---|
-| `Ursprung/App` | App entry point, scenes, menu commands |
-| `Ursprung/Systems` | `GameSystem`/`CoreDefinition` models and the `SystemCatalog` |
-| `Ursprung/Library` | SwiftData `Game` model, folder scanner, `LibraryStore`, ROM patches and per-game extras |
-| `Ursprung/Achievements` | RetroAchievements account (`AchievementService`) |
-| `Ursprung/Metadata` | ScreenScraper API client and the scraping queue |
-| `Ursprung/Cores` | Core download/installation and BIOS management |
-| `Ursprung/Emulation` | Session control, input routing, Metal renderer, shaders |
-| `Ursprung/Bridge` | Objective-C/C libretro host, `libretro.h`, rewind buffer, rcheevos client, librashader presets and filter chains, bridging header |
-| `Ursprung/UI` | SwiftUI views (library, player, settings, components) |
-| `Ursprung/Support` | Paths, preferences, keychain, ZIP reader, secrets |
+| `Atrium/App` | App entry point, scenes, menu commands |
+| `Atrium/Systems` | `GameSystem`/`CoreDefinition` models and the `SystemCatalog` |
+| `Atrium/Library` | SwiftData `Game` model, folder scanner, `LibraryStore`, ROM patches and per-game extras |
+| `Atrium/Achievements` | RetroAchievements account (`AchievementService`) |
+| `Atrium/Metadata` | ScreenScraper API client and the scraping queue |
+| `Atrium/Cores` | Core download/installation and BIOS management |
+| `Atrium/Emulation` | Session control, input routing, Metal renderer, shaders |
+| `Atrium/Bridge` | Objective-C/C libretro host, `libretro.h`, rewind buffer, rcheevos client, librashader presets and filter chains, bridging header |
+| `Atrium/UI` | SwiftUI views (library, player, settings, components) |
+| `Atrium/Support` | Paths, preferences, keychain, ZIP reader, secrets |
 | `ThirdParty/rcheevos` | rcheevos 12.5.0 (see its README for what was left out) |
-| `Tools/ursprung-smoke` | Headless command-line harness for cores |
-| `UrsprungTests` | Unit tests (Swift Testing) |
+| `Tools/atrium-smoke` | Headless command-line harness for cores |
+| `AtriumTests` | Unit tests (Swift Testing) |
 
 ## Concurrency model
 
@@ -170,7 +170,7 @@ the user's own presets into `Shaders/User/` (`ShaderImport` copies the files a
 preset reads along, from its package only: the deepest folder holding it, its
 referenced presets and their passes, links followed, regular files only),
 which backups carry. Its index lists every `.slangp`
-with category, pass count (`SlangPresetFile`, Ursprung's own reader) and
+with category, pass count (`SlangPresetFile`, Atrium's own reader) and
 parameter count (librashader, parse only); `Shaders/index.json` caches it by
 file date. The filter menus (`ShaderPicker`) show the built-in filters,
 favourite presets and the shader browser.
@@ -253,7 +253,7 @@ files referenced by `.cue`/`.gdi`/`.m3u`/`.ccd`, and identifies the system:
 2. Otherwise the file extension decides.
 3. Zips without a helpful folder name are identified by their largest entry.
 
-`FolderStructure` creates, on request (first launch, File menu), `Ursprung/`
+`FolderStructure` creates, on request (first launch, File menu), `Atrium/`
 with `ROMs/` (a library folder with one sub folder per system, named by
 `SystemCatalog.folderNames`; each name is a folder alias of its system) and a
 watched `BIOS/` folder next to it, which the scanner skips. Systems added in
@@ -307,7 +307,7 @@ Developer ID team, and keeps the active and the previous version in
 data folder (`-datapath`). Before every launch `ARMSX2Launch` runs pre-flight
 checks (every ARMSX2 error dialog crashes it on macOS 27), picks the BIOS by
 disc region and writes `PCSX2.ini` through `PCSX2Config`, merging the keys
-Ursprung manages (folders, BIOS, renderer, PINE, resume, `ARMSX2Controls`'
+Atrium manages (folders, BIOS, renderer, PINE, resume, `ARMSX2Controls`'
 bindings and hotkeys) into the file so ARMSX2's other settings survive.
 `ExternalSession` owns the process: one SIGTERM to quit (ARMSX2 then writes its
 resume state), SIGKILL after 10 s. `PINEClient` talks to ARMSX2's PINE socket

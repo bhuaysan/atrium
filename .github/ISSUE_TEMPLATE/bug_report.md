@@ -14,14 +14,14 @@ A clear description of the problem.
 **Expected behaviour**
 
 **Environment**
-- Ursprung version / commit:
+- Atrium version / commit:
 - macOS version:
 - Mac model (e.g. MacBook Pro M3):
 - System and core (e.g. SNES / Snes9x):
 - Game file type (e.g. .sfc, .cue/.bin, .zip):
 
 **Logs**
-Core logs can be viewed in Console.app (subsystem `io.github.bhuaysan.Ursprung`),
-or by starting the app from Terminal with `URSPRUNG_CORE_LOG=1`.
+Core logs can be viewed in Console.app (subsystem `io.github.bhuaysan.Atrium`),
+or by starting the app from Terminal with `ATRIUM_CORE_LOG=1`.
 
 Please do **not** attach or link ROMs, disc images or BIOS files.

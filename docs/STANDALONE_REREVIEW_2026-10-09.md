@@ -20,7 +20,7 @@ Anwendungscode, vorhandene Tests und der ursprüngliche Review-Bericht wurden in
 
 ### R1 — P1: Ungesicherte Addition vor der eigentlichen Überlaufprüfung
 
-**Stelle:** [ARMSX2States.swift:229](../Ursprung/Emulation/ARMSX2States.swift#L229).
+**Stelle:** [ARMSX2States.swift:229](../Atrium/Emulation/ARMSX2States.swift#L229).
 
 Die neue Prüfung berechnet:
 
@@ -34,7 +34,7 @@ entry.localHeaderOffset.addingReportingOverflow(header + entry.compressedSize)
 
 **Reproduktion:** Synthetisches `.p2s` mit allen erwarteten Dateinamen; im Central Directory des ersten Pflichteintrags `compressedSize = 0xFFFFFFFF` gesetzt und als ZIP64-Wert `UInt64.max` hinterlegt. Die Metadaten des Central Directory wurden korrekt angepasst. Der Aufruf von `ARMSX2States.isLoadable` im isolierten Programm mit unveränderten Produktdateien beendet den Prozess mit SIGTRAP, Shell-Exitcode 133.
 
-**Folge:** Die Prüfung einer beschädigten Resume-Datei oder eines ausgewählten States kann Ursprung selbst beenden, statt den State kontrolliert abzulehnen. Dies ist ein neuer Fehler im Fix für F4.
+**Folge:** Die Prüfung einer beschädigten Resume-Datei oder eines ausgewählten States kann Atrium selbst beenden, statt den State kontrolliert abzulehnen. Dies ist ein neuer Fehler im Fix für F4.
 
 **Fix-Vorschlag:** Jede Addition separat mit `addingReportingOverflow` absichern oder subtraktiv gegen die verbleibende Dateilänge prüfen. Beispielsweise zuerst den tatsächlichen Datenoffset sicher bestimmen, dann `dataOffset <= directoryOffset` und `compressedSize <= directoryOffset - dataOffset` prüfen. Vorher keine ungeschützte Summe aus Dateimetadaten bilden.
 
@@ -42,7 +42,7 @@ entry.localHeaderOffset.addingReportingOverflow(header + entry.compressedSize)
 
 ### R2 — P1: Restore wird während eines Backend-Wechsels wieder freigegeben
 
-**Stellen:** [SaveStatesBrowser.swift:190](../Ursprung/UI/Library/SaveStatesBrowser.swift#L190), [EmulationSession.swift:251](../Ursprung/Emulation/EmulationSession.swift#L251), [EmulationSession.swift:697](../Ursprung/Emulation/EmulationSession.swift#L697), [EmulationSession.swift:807](../Ursprung/Emulation/EmulationSession.swift#L807).
+**Stellen:** [SaveStatesBrowser.swift:190](../Atrium/UI/Library/SaveStatesBrowser.swift#L190), [EmulationSession.swift:251](../Atrium/Emulation/EmulationSession.swift#L251), [EmulationSession.swift:697](../Atrium/Emulation/EmulationSession.swift#L697), [EmulationSession.swift:807](../Atrium/Emulation/EmulationSession.swift#L807).
 
 Die neue Restore-Sperre verwendet `session.isStandaloneGameActive`. Diese Property beschreibt während `.preparing` das Backend des angeforderten nächsten Spiels, nicht zuverlässig den noch laufenden Prozess.
 
@@ -64,7 +64,7 @@ Ein langsamer Save beziehungsweise das Herunterfahren hält dieses Zeitfenster �
 
 ### R3 — P2: Central-Directory-Angaben ersetzen keine Prüfung der lokalen Header
 
-**Stelle:** [ARMSX2States.swift:224](../Ursprung/Emulation/ARMSX2States.swift#L224).
+**Stelle:** [ARMSX2States.swift:224](../Atrium/Emulation/ARMSX2States.swift#L224).
 
 `hasRequiredEntries` liest die lokalen ZIP-Header der Pflichtdateien nicht. Es schätzt deren Länge mit `30 + entry.path.utf8.count` und prüft lediglich die im Central Directory angegebene komprimierte Größe gegen dessen Anfang.
 
@@ -77,7 +77,7 @@ isLoadable= true
 GS.bin read failed: corrupt
 ```
 
-Der zweite Aufruf verwendet Ursprungs eigenen `ZipArchive.data(of:)`. Bereits dieser erkennt den Defekt, den die vorgeschaltete Ladbarkeitsprüfung übersieht.
+Der zweite Aufruf verwendet Atriums eigenen `ZipArchive.data(of:)`. Bereits dieser erkennt den Defekt, den die vorgeschaltete Ladbarkeitsprüfung übersieht.
 
 **Folge:** Strukturell unlesbare States werden weiterhin an den Emulator übergeben. Der ursprüngliche F4 ist für fehlende Dateinamen korrigiert, aber nicht für beschädigte lokale ZIP-Strukturen. Dies ist unabhängig von der ausdrücklich dokumentierten Einschränkung, Zstd-Nutzdaten nicht zu dekomprimieren oder vollständig zu prüfen.
 
@@ -98,7 +98,7 @@ Der zweite Aufruf verwendet Ursprungs eigenen `ZipArchive.data(of:)`. Bereits di
 
 ## Ergänzende Hinweise
 
-- **F1: gemeinsame Log-Datei bleibt eine Nebenwirkung von `prepare`.** [ARMSX2Launch.swift:149](../Ursprung/Emulation/ARMSX2Launch.swift#L149) löscht weiterhin `request.logFile` vor der Generation-Prüfung des Aufrufers. Eine verspätete Vorbereitung A kann somit die bereits geöffnete Log-Datei von B entfernen. Bei einem anschließenden Fehler fehlt die Diagnose am erwarteten Pfad. Auch die Log-Ersetzung in den exklusiven Startabschnitt verschieben oder pro Session einen eigenen Log-Pfad verwenden.
+- **F1: gemeinsame Log-Datei bleibt eine Nebenwirkung von `prepare`.** [ARMSX2Launch.swift:149](../Atrium/Emulation/ARMSX2Launch.swift#L149) löscht weiterhin `request.logFile` vor der Generation-Prüfung des Aufrufers. Eine verspätete Vorbereitung A kann somit die bereits geöffnete Log-Datei von B entfernen. Bei einem anschließenden Fehler fehlt die Diagnose am erwarteten Pfad. Auch die Log-Ersetzung in den exklusiven Startabschnitt verschieben oder pro Session einen eigenen Log-Pfad verwenden.
 - **F5: Scanner-Verhalten ist unverändert.** Bestehende PS2-M3U-Dateien unterdrücken weiterhin ihre referenzierten Images. Der neue Fehlertext bietet als Ausweg das Löschen der Playlist an. Besser diese Deskriptoren für das Backend beim Scan gesondert behandeln und startbare Images sichtbar halten; die User-Datei muss dafür nicht gelöscht werden. Auch mehrteilige CUE-Dateien sind durch die Auswahl nur des ersten passenden Images nicht vollständig unterstützt.
 - **Versionswechsel und Fehleranzeige:** `activate` und Rollback persistieren vor der Übernahme des neuen Zustands; der neue Fehlerfalltest für Rollback besteht. Restore-Fehler werden jetzt angezeigt. Diese Korrekturen sind nachvollziehbar.
 - **Beobachtung und temporäre Ressourcen:** Der State-Watcher sowie die Bereinigung des PINE-Ordners in den Fehlerpfaden sind vorhanden. Die Sperre neuer Save-/Load-Anfragen bei `shutdown != nil` ist ebenfalls umgesetzt. Diese Ergänzungen beheben aber nicht R2, weil Restore eine andere Sperrabfrage verwendet.
@@ -106,7 +106,7 @@ Der zweite Aufruf verwendet Ursprungs eigenen `ZipArchive.data(of:)`. Bereits di
 
 ## Tests und Nachweisgrenzen
 
-**Vollständiger Xcode-Lauf:** `xcodebuild test`, macOS arm64, erfolgreich. Die XCResult-Zusammenfassung weist **438 Testfälle insgesamt, 436 bestanden, zwei übersprungen, null fehlgeschlagen** aus. Mit Parameterfällen sind es **479 bestandene Ausführungen**. Die beiden übersprungenen Tests sind `SlangPresetTests/everyPackPresetRoundTrips()` und `ShaderLibraryTests/realPackUnpacksAndIndexes()`; beide setzen ein über `URSPRUNG_SHADER_PACK` bereitgestelltes echtes Shader-Paket voraus. Die Angabe „alle 438 Tests bestehen“ im Umsetzungsbericht ist deshalb für diesen Lauf genauer als „436 bestanden, zwei übersprungen“ zu formulieren.
+**Vollständiger Xcode-Lauf:** `xcodebuild test`, macOS arm64, erfolgreich. Die XCResult-Zusammenfassung weist **438 Testfälle insgesamt, 436 bestanden, zwei übersprungen, null fehlgeschlagen** aus. Mit Parameterfällen sind es **479 bestandene Ausführungen**. Die beiden übersprungenen Tests sind `SlangPresetTests/everyPackPresetRoundTrips()` und `ShaderLibraryTests/realPackUnpacksAndIndexes()`; beide setzen ein über `ATRIUM_SHADER_PACK` bereitgestelltes echtes Shader-Paket voraus. Die Angabe „alle 438 Tests bestehen“ im Umsetzungsbericht ist deshalb für diesen Lauf genauer als „436 bestanden, zwei übersprungen“ zu formulieren.
 
 **Zusätzliche Prüfungen:** R1/R3 wurden mit einem separaten Swift-Programm unter `/tmp` reproduziert. Es kompiliert die unveränderten Produktdateien `ARMSX2States.swift`, `SaveStates.swift`, `PINEClient.swift`, `ZipArchive.swift` und `FileMerge.swift`; lediglich die nicht benötigten umgebenden Typen `GraphicsAPI` und `StandaloneLaunchError` sind minimal ersetzt. Der Trap betraf ausschließlich dieses Testprogramm. Die ZIP-Dateien sind synthetisch; echte Nutzerdaten wurden nicht verwendet. R2 wurde durch den Kontrollfluss und die isolierte Auswertung des unveränderten Aktivitäts-Prädikats geprüft.
 
@@ -131,6 +131,6 @@ Ergänzende Hinweise:
 - **F1, Log-Datei:** Das Löschen des alten Logs ist aus `prepare` in `writeSharedFiles()` (vormals `writeSettings()`) gewandert und läuft damit im exklusiven Startabschnitt (`onlyTheLaunchThatStartsTouchesTheSharedFiles`).
 - **Unabhängige Fixture:** `handmadeZip(files:zip64:)` in `TestSupport.swift` baut States Byte für Byte ohne `/usr/bin/zip`; der gültige Fall muss bestehen. Die Liste `ARMSX2States.requiredEntries` bleibt aus `SaveState.cpp` des Pins abgeleitet. Ob sie zum Emulator passt, zeigt erst ein echter ARMSX2-State.
 - **Testseam:** `EmulationSession.adoptExternalForTesting` (nur `DEBUG`) setzt einen laufenden Prozess als Standalone-Session ein.
-- **Weiter offen:** Bestehende PS2-M3U-Dateien verstecken ihre Images beim Scan weiterhin. Mehrteilige CUE-Dateien starten mit dem ersten passenden Image. Eine ZIP64-`uncompressedSize`, die nicht zur Nutzlast passt, kann Ursprung ohne Dekompression nicht erkennen.
+- **Weiter offen:** Bestehende PS2-M3U-Dateien verstecken ihre Images beim Scan weiterhin. Mehrteilige CUE-Dateien starten mit dem ersten passenden Image. Eine ZIP64-`uncompressedSize`, die nicht zur Nutzlast passt, kann Atrium ohne Dekompression nicht erkennen.
 
 **Tests:** 440 Tests in 95 Suites: 438 bestanden, zwei übersprungen (dieselben Shader-Pack-Tests), keiner fehlgeschlagen (`xcodebuild test`, macOS arm64). Kein Live-Test mit ARMSX2.

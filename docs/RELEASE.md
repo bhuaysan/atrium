@@ -1,7 +1,7 @@
 # Releasing
 
-Ursprung is distributed as a signed, notarized disk image on GitHub Releases.
-People without Xcode download it there; Ursprung › Check for Updates… compares
+Atrium is distributed as a signed, notarized disk image on GitHub Releases.
+People without Xcode download it there; Atrium › Check for Updates… compares
 the running version with the latest release and opens its page.
 
 ## One-time setup
@@ -13,7 +13,7 @@ the running version with the latest release and opens its page.
    [account.apple.com](https://account.apple.com) and store it in the keychain:
 
    ```sh
-   xcrun notarytool store-credentials ursprung-notary \
+   xcrun notarytool store-credentials atrium-notary \
        --apple-id <apple id> --team-id <team id> --password <app-specific password>
    ```
 
@@ -27,7 +27,7 @@ the running version with the latest release and opens its page.
 1. Raise `MARKETING_VERSION` (and `CURRENT_PROJECT_VERSION`) in `project.yml`.
 2. Run `make dist`. It builds the Release configuration signed with the first
    Developer ID Application identity (override with `SIGN_IDENTITY`), checks
-   the signature, creates `build/dist/Ursprung-<version>.dmg`, notarizes and
+   the signature, creates `build/dist/Atrium-<version>.dmg`, notarizes and
    staples it, and writes its SHA-256 checksum next to it.
 3. Tag the commit `v<version>`, create a GitHub release for the tag and attach
    the disk image and the `.sha256` file. Check for Updates… reads the tag name
@@ -40,7 +40,7 @@ distribution.
 ## What the build needs
 
 - Hardened runtime with `disable-library-validation`, `allow-jit` and
-  `allow-unsigned-executable-memory` (see `Ursprung/Ursprung.entitlements`):
+  `allow-unsigned-executable-memory` (see `Atrium/Atrium.entitlements`):
   libretro cores are downloaded at runtime and not signed by us, and dynamic
   recompilers generate code.
 - No `get-task-allow` entitlement; `make dist` stops if the signed app has it.

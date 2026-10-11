@@ -1,19 +1,19 @@
 # MoltenVK
 
 [MoltenVK](https://github.com/KhronosGroup/MoltenVK) 1.4.2 by the Khronos
-Group. It implements Vulkan on top of Metal; Ursprung uses it to give
+Group. It implements Vulkan on top of Metal; Atrium uses it to give
 libretro cores a Vulkan context (paraLLEl-RDP, Dolphin, Flycast, …), see
-`docs/VULKAN_PLAN.md`. Ursprung's own rendering stays on Metal.
+`docs/VULKAN_PLAN.md`. Atrium's own rendering stays on Metal.
 
 ## Licences
 
 - MoltenVK is available under the Apache License 2.0 (`LICENSE`), which is
-  compatible with Ursprung's GPL-3.0-or-later. Its source code is at
+  compatible with Atrium's GPL-3.0-or-later. Its source code is at
   <https://github.com/KhronosGroup/MoltenVK/tree/v1.4.2>.
 - The Vulkan headers in the release (`include/vulkan`, `include/vk_video`)
   are from Khronos' Vulkan-Headers, under the Apache License 2.0 or the MIT
   licence (see the header comments).
-- `Ursprung/Bridge/libretro_vulkan.h` is from libretro-common (MIT, see its
+- `Atrium/Bridge/libretro_vulkan.h` is from libretro-common (MIT, see its
   header), unchanged.
 
 ## What is here
@@ -25,7 +25,7 @@ libretro cores a Vulkan context (paraLLEl-RDP, Dolphin, Flycast, …), see
   (5 MB instead of 11 MB) and copies the C headers. The release already uses
   `@rpath/libMoltenVK.dylib` as install name. Xcode links the dylib directly
   (no Vulkan loader) and embeds it, re-signed, in
-  `Ursprung.app/Contents/Frameworks`.
+  `Atrium.app/Contents/Frameworks`.
 - `libvulkan.1.dylib`: a symlink to `libMoltenVK.dylib`, made by the fetch
   script in `lib/` and by a build phase in the app's `Frameworks`. Dolphin
   `dlopen`s that name at boot; dyld finds it through the rpath and returns the

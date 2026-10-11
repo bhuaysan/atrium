@@ -1,8 +1,8 @@
 # Shaders
 
-Ursprung draws every game through a filter. Seven built-in filters (Sharp,
+Atrium draws every game through a filter. Seven built-in filters (Sharp,
 Pixel Perfect, Smooth, Scanlines, CRT, CRT Curved, Handheld LCD) are fast and
-always there. On top of them, Ursprung renders **RetroArch slang presets**
+always there. On top of them, Atrium renders **RetroArch slang presets**
 (`.slangp`) with [librashader](https://github.com/SnowflakePowered/librashader):
 the same CRT, handheld, NTSC and smoothing shaders RetroArch uses, with their
 parameters, and a shader editor to change them or build your own.
@@ -14,7 +14,7 @@ choose **RetroArch Shaders…** in any Filter menu and download from there. The
 libretro shader pack (about 55 MB, more than 2,500 presets) comes from the
 libretro buildbot, like the cores; **Check for Updates** in the same place
 fetches a newer one. The shaders are separate open source projects with their
-own licences; Ursprung does not ship them.
+own licences; Atrium does not ship them.
 
 Presets of your own (for example from a forum or from RetroArch) can be
 imported in the shader browser with **Import…**, or dropped onto it. A single
@@ -125,7 +125,7 @@ says so; the editor shows the exact error.
 
 ## Files and backups
 
-Shaders live in `~/Library/Application Support/Ursprung/Shaders/`:
+Shaders live in `~/Library/Application Support/Atrium/Shaders/`:
 
 | Folder | Contents |
 |---|---|

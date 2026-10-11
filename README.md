@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/icon.png" width="128" alt="Ursprung app icon">
+  <img src="docs/icon.png" width="128" alt="Atrium app icon">
 </p>
 
-<h1 align="center">Ursprung</h1>
+<h1 align="center">Atrium</h1>
 
 <p align="center">
   A native retro game library for macOS — organise your games, see their covers and stories, and play them with one click.<br>
@@ -22,7 +22,7 @@
 
 ## Features
 
-- **A library, not a file browser.** Point Ursprung at your game folders; it
+- **A library, not a file browser.** Point Atrium at your game folders; it
   identifies the system of every game from file types and folder names, hides
   disc track files, and rescans by itself when files change. A scan report
   lists files it could not identify (add them with a system of your choice)
@@ -73,7 +73,7 @@
   [RetroAchievements](https://retroachievements.org) account to unlock
   achievements while you play, with badges, progress and leaderboards in the
   player and an optional hardcore mode.
-- **Multi-disc games** with disc playlists Ursprung creates from loose discs,
+- **Multi-disc games** with disc playlists Atrium creates from loose discs,
   disc labels, reordering and a check for missing discs.
 - **Your progress stays put.** Renamed or moved ROMs keep their favourites,
   play time and saves; missing files can be located again. One-file backups
@@ -91,7 +91,7 @@
 - **Cores you can trust.** Check the buildbot for newer core builds; after an
   update the previous version stays installed, so you can go back if a game
   breaks.
-- **BIOS management.** Drop BIOS files in and Ursprung recognises them by
+- **BIOS management.** Drop BIOS files in and Atrium recognises them by
   checksum and names them the way each core expects.
 - **English and German** user interface.
 
@@ -119,11 +119,11 @@ names, cores and BIOS requirements per system.
 
 ```sh
 brew install xcodegen
-git clone https://github.com/bhuaysan/ursprung.git
-cd ursprung
+git clone https://github.com/bhuaysan/atrium.git
+cd atrium
 cp .env.example .env        # optional: add ScreenScraper developer credentials
-make project                # downloads librashader and MoltenVK, generates Ursprung.xcodeproj
-open Ursprung.xcodeproj     # then press ⌘R
+make project                # downloads librashader and MoltenVK, generates Atrium.xcodeproj
+open Atrium.xcodeproj     # then press ⌘R
 ```
 
 Or entirely from the command line: `make run`. Other targets: `make test`,
@@ -141,7 +141,7 @@ Development certificate instead, copy `Config/Signing.local.xcconfig.example` to
 ScreenScraper requires *developer* credentials for every API client. They are
 **not** part of this repository. Request your own developer access via the
 [ScreenScraper](https://www.screenscraper.fr/) forum, put the credentials into
-`.env` and rebuild — the build script embeds them in the app. Without them Ursprung works normally, it just can't fetch metadata.
+`.env` and rebuild — the build script embeds them in the app. Without them Atrium works normally, it just can't fetch metadata.
 
 Players can optionally enter their personal ScreenScraper account in
 **Settings → Metadata** for a higher daily quota. Details:
@@ -149,7 +149,7 @@ Players can optionally enter their personal ScreenScraper account in
 
 ## Getting started
 
-1. On the first launch Ursprung offers to create `~/Ursprung` with `ROMs/` (one
+1. On the first launch Atrium offers to create `~/Atrium` with `ROMs/` (one
    folder per system) and `BIOS/`: copy games and BIOS files in, and they show up
    by themselves. Or click **Add Folder…** and choose the folder with your games
    (**File → Set Up Game Folders…** offers the structure again later).
@@ -181,11 +181,11 @@ opens the menu as well), can be changed in **Settings → Controls**.
 
 ## Your data
 
-Everything lives in `~/Library/Application Support/Ursprung/`:
+Everything lives in `~/Library/Application Support/Atrium/`:
 
 | Folder | Contents |
 |---|---|
-| `Library.store` | The library database. If it cannot be opened, Ursprung asks before moving it to `Library.store-backup-<date>/`; it is never deleted automatically |
+| `Library.store` | The library database. If it cannot be opened, Atrium asks before moving it to `Library.store-backup-<date>/`; it is never deleted automatically |
 | `Cores/` | Downloaded libretro cores |
 | `System/` | BIOS files and core assets (the libretro system directory) |
 | `Saves/<system>/<game-id>/` | Battery saves (`.srm`), one folder per game. Memory cards and other core saves live in `Saves/<system>/` |
@@ -203,13 +203,13 @@ the backup format.
 
 ## Legal
 
-Ursprung is an emulator frontend. It contains **no games, BIOS files or
+Atrium is an emulator frontend. It contains **no games, BIOS files or
 copyrighted system software**, and it does not help you obtain them. Only use
 games and BIOS files you have dumped from media and hardware you own.
 
 The libretro cores are independent projects under their own licenses (GPL,
 LGPL, MIT, and some non-commercial ones). They are downloaded from the libretro
-buildbot at runtime and are not distributed with Ursprung.
+buildbot at runtime and are not distributed with Atrium.
 
 Box art and other media are provided by ScreenScraper and its contributors.
 
@@ -221,14 +221,14 @@ Contributions are very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and th
 
 ## License
 
-Copyright © 2026 Ursprung contributors.
+Copyright © 2026 Atrium contributors.
 
-Ursprung is free software: you can redistribute it and/or modify it under the
+Atrium is free software: you can redistribute it and/or modify it under the
 terms of the [GNU General Public License](LICENSE) as published by the Free
 Software Foundation, either version 3 of the License, or (at your option) any
 later version.
 
-`Ursprung/Bridge/libretro.h` is © The RetroArch team, MIT licensed.
+`Atrium/Bridge/libretro.h` is © The RetroArch team, MIT licensed.
 `ThirdParty/rcheevos` is [rcheevos](https://github.com/RetroAchievements/rcheevos)
 © RetroAchievements.org, MIT licensed.
 The app embeds [librashader](https://github.com/SnowflakePowered/librashader)
@@ -236,7 +236,7 @@ The app embeds [librashader](https://github.com/SnowflakePowered/librashader)
 source code is on GitHub (see `ThirdParty/librashader/README.md`).
 It also embeds [MoltenVK](https://github.com/KhronosGroup/MoltenVK) 1.4.2
 © The Khronos Group, under the Apache License 2.0 (see
-`ThirdParty/moltenvk/README.md`); `Ursprung/Bridge/libretro_vulkan.h` is
+`ThirdParty/moltenvk/README.md`); `Atrium/Bridge/libretro_vulkan.h` is
 © The RetroArch team, MIT licensed.
 
 ## Acknowledgements

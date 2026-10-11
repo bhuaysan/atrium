@@ -1,4 +1,4 @@
-# Code-Review – Ursprung
+# Code-Review – Atrium
 
 ## Nachprüfung vom 29.09.2026
 
@@ -6,7 +6,7 @@
 
 ### Noch offen: [P1] Backup-Fehlerbehandlung löscht ein bereits vorhandenes Backup
 
-**Fundstelle:** `Ursprung/App/LibraryDatabase.swift:44–56`, insbesondere das bedingungslose `removeItem(at: backup)` in Zeile 56. Zusammenhang mit ursprünglichem Finding 1.
+**Fundstelle:** `Atrium/App/LibraryDatabase.swift:44–56`, insbesondere das bedingungslose `removeItem(at: backup)` in Zeile 56. Zusammenhang mit ursprünglichem Finding 1.
 
 **Auslöser:** Der berechnete Backup-Ordner existiert bereits und enthält eine gleichnamige Datenbankdatei. `createDirectory(..., withIntermediateDirectories: true)` akzeptiert den vorhandenen Ordner. Das anschließende `moveItem` scheitert am bereits vorhandenen Ziel. Der `catch` entfernt daraufhin den gesamten Backup-Ordner, obwohl dessen Inhalt aus einem früheren Sicherungsvorgang stammt. Der Standardname verwendet einen Zeitstempel ohne zusätzliche eindeutige Kennung; eine Namenskollision wird weder verhindert noch abgefangen.
 
@@ -68,7 +68,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 1. [P1] Bei jedem Fehler beim Öffnen der Datenbank wird die Bibliothek gelöscht
 
-**Fundstelle:** `Ursprung/App/UrsprungApp.swift:38–44` · bestehender Code.
+**Fundstelle:** `Atrium/App/AtriumApp.swift:38–44` · bestehender Code.
 
 **Auslöser und Auswirkung:** Schlägt die Erstellung des `ModelContainer` fehl, entfernt der allgemeine `catch` unmittelbar `Library.store`. Er unterscheidet nicht zwischen einer tatsächlich beschädigten Datenbank, einem Migrationsproblem oder einem anderen Öffnungsfehler. Damit kann ein grundsätzlich behebbarer Fehler zur Löschung der Bibliothek mit Favoriten, Spielzeiten und Metadaten führen. Scheitert der nächste Versuch ebenfalls, beendet `try!` zusätzlich die App. Die ursprüngliche Datenbank steht dann nicht mehr für eine Wiederherstellung zur Verfügung.
 
@@ -78,7 +78,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 2. [P1] Gleichnamige ROMs teilen denselben Batteriespielstand
 
-**Fundstellen:** `Ursprung/Emulation/EmulationSession.swift:141–145`, `Ursprung/Library/Game.swift:105–107` · bestehender Code.
+**Fundstellen:** `Atrium/Emulation/EmulationSession.swift:141–145`, `Atrium/Library/Game.swift:105–107` · bestehender Code.
 
 **Auslöser und Auswirkung:** Zwei Spiele desselben Systems aus unterschiedlichen Verzeichnissen mit identischem Dateistamm, beispielsweise `Original/Game.sfc` und `Hack/Game.sfc`, erhalten beide den Pfad `Saves/snes/Game.srm`. Auch `Game.sfc` und `Game.smc` kollidieren. Obwohl die Bibliothek sie anhand ihres vollständigen Pfades unterscheidet, lädt und überschreibt die Emulation denselben Batteriespielstand. Bei kompatibler Speichergröße kann das unbemerkt den Fortschritt des anderen Spiels ersetzen.
 
@@ -88,7 +88,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 3. [P1] Ordnerentfernung löscht auch Spiele aus ähnlich benannten Nachbarordnern
 
-**Fundstellen:** `Ursprung/Library/LibraryStore.swift:35–39` und `88–94` · bestehender Code.
+**Fundstellen:** `Atrium/Library/LibraryStore.swift:35–39` und `88–94` · bestehender Code.
 
 **Auslöser und Auswirkung:** Die Zugehörigkeit zu einem Ordner wird mit `String.hasPrefix` geprüft. `/ROMs/SNES-hacks/Game.sfc` beginnt ebenfalls mit `/ROMs/SNES`. Wird der Bibliotheksordner `/ROMs/SNES` entfernt, werden dadurch auch Datensätze und Medien aus dem eigenständigen Ordner `/ROMs/SNES-hacks` gelöscht. Die gleiche Prüfung kann beim Rescan Spiele eines nicht erreichbaren Ordners fälschlich einem erreichbaren Nachbarordner zuordnen und entgegen dem Kommentar entfernen. Die ROM-Dateien selbst werden dabei nicht gelöscht.
 
@@ -98,7 +98,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 4. [P1] Verkürzte ZIP64-Zusatzfelder lassen den Prozess abstürzen
 
-**Fundstelle:** `Ursprung/Support/ZipArchive.swift:149–158` · bestehender Code · separat reproduziert.
+**Fundstelle:** `Atrium/Support/ZipArchive.swift:149–158` · bestehender Code · separat reproduziert.
 
 **Auslöser und Auswirkung:** Die Schleife prüft nur, ob vier Bytes für Tag und Länge vorhanden sind. Bei Tag `0x0001` werden anschließend bis zu drei 64-Bit-Werte gelesen, ohne die deklarierte Feldlänge und die verbleibenden Bytes zu prüfen. Ein Verzeichniseintrag mit `uncompressedSize = 0xFFFFFFFF` und einem ZIP64-Feld der Länge null erreicht `directory.uint64(at: cursor)` hinter dem Datenende. Das führt zu einem Bounds-Trap statt zu `ZipError.corrupt`. Ein solches Archiv kann bereits bei der Systemerkennung während eines Bibliotheksscans den gesamten Prozess beenden; `try?` fängt den Trap nicht ab.
 
@@ -110,7 +110,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 5. [P2] Ein noch ladender Runner wird beim Spielwechsel nicht abgewartet
 
-**Fundstellen:** `Ursprung/Emulation/EmulationSession.swift:152–169` und `237–239`; ergänzend `Ursprung/Bridge/URLibretroCore.m:246–253` · bestehender Code.
+**Fundstellen:** `Atrium/Emulation/EmulationSession.swift:152–169` und `237–239`; ergänzend `Atrium/Bridge/URLibretroCore.m:246–253` · bestehender Code.
 
 **Auslöser und Auswirkung:** Während `runner.start(...)` auf das Laden eines Spiels wartet, existiert der Runner nur als lokale Variable. `self.runner` wird erst nach erfolgreichem Laden gesetzt. Startet der Nutzer währenddessen ein zweites Spiel, findet `shutDownRunner` keinen Runner und kehrt sofort zurück. Das zweite Spiel kann deshalb seinen Core starten, während der erste Core noch lädt. Die Bridge lehnt diesen Versuch mit „Another game is already running.“ ab. Die Generation-Prüfung räumt den ersten Runner erst nach dessen Ladeabschluss auf und verhindert den fehlgeschlagenen zweiten Start nicht.
 
@@ -120,7 +120,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 6. [P2] Ein zweiter Installationsaufruf wartet nicht auf den laufenden Download
 
-**Fundstelle:** `Ursprung/Cores/CoreManager.swift:54–64` · bestehender Code.
+**Fundstelle:** `Atrium/Cores/CoreManager.swift:54–64` · bestehender Code.
 
 **Auslöser und Auswirkung:** Läuft die Erstinstallation eines Cores bereits, kehrt `install` wegen `downloads[core.id] != nil` erfolgreich zurück. Ein paralleler `ensureInstalled`-Aufruf erhält dadurch bei einem Core ohne zusätzliche System-Assets sofort den Zielpfad, obwohl die Dylib noch nicht existiert. Beispielsweise kann der Start eines Spiels während der Installation über die Einstellungen mit einem Ladefehler abbrechen. Die Fortschrittsanzeige wird hier gleichzeitig als Synchronisationsmechanismus verwendet, enthält aber kein abwartbares Ergebnis.
 
@@ -130,7 +130,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 7. [P2] Ein gleich großer ROM-Austausch verwendet weiterhin den alten ZIP-Cache
 
-**Fundstelle:** `Ursprung/Emulation/EmulationSession.swift:214–222` · bestehender Code.
+**Fundstelle:** `Atrium/Emulation/EmulationSession.swift:214–222` · bestehender Code.
 
 **Auslöser und Auswirkung:** Ein bereits entpacktes ROM wird ausschließlich anhand seiner Dateigröße als aktuell bewertet. Wird das ZIP am selben Pfad durch eine gepatchte oder korrigierte Fassung mit gleichem inneren Dateinamen und gleicher unkomprimierter Größe ersetzt, bleibt die Spiel-ID erhalten und die alte Cache-Datei wird erneut gestartet. Gleich große ROM-Patches sind damit trotz ersetzter Quelldatei nicht wirksam.
 
@@ -140,7 +140,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 8. [P2] Ordneränderungen während eines Scans werden mit einem veralteten Stand überschrieben
 
-**Fundstelle:** `Ursprung/Library/LibraryStore.swift:57–64` und die anschließende Übernahme in `70–95` · bestehender Code.
+**Fundstelle:** `Atrium/Library/LibraryStore.swift:57–64` und die anschließende Übernahme in `70–95` · bestehender Code.
 
 **Auslöser und Auswirkung:** `rescan` kopiert die Ordnerliste vor dem `await`. Während der Hintergrundscan läuft, können `addFolder` und `removeFolder` diese Liste verändern. Ein dabei angeforderter weiterer Scan wird durch `guard !isScanning` verworfen. Der erste Scan übernimmt anschließend Ergebnisse seines alten Snapshots: Bereits entfernte Ordner können wieder Spiele liefern; neu hinzugefügte Ordner werden nicht eingelesen, bis der Nutzer später erneut scannt. Bei währenddessen entfernten Spielen können neue Datensätze mit neuen IDs entstehen, statt die ursprünglichen Metadaten zu erhalten.
 
@@ -150,7 +150,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 9. [P2] Ausgefilterte HID-Geräte können weiterhin das Spielmenü auslösen
 
-**Fundstellen:** `Ursprung/Emulation/HIDGamepadManager.swift:164–176`, `Ursprung/Emulation/InputRouter.swift:22–33` · neue Controller-Unterstützung.
+**Fundstellen:** `Atrium/Emulation/HIDGamepadManager.swift:164–176`, `Atrium/Emulation/InputRouter.swift:22–33` · neue Controller-Unterstützung.
 
 **Auslöser und Auswirkung:** Der Router filtert von GameController behandelte HID-Geräte aus `hidGamepads` heraus. Der HID-Manager nimmt diese Geräte dennoch in seine eigene Liste auf und ruft für alle Geräte `onMenuButton` auf. Dieser Callback ist direkt mit dem Menü-Toggle verbunden und durchläuft den Filter nicht. Bei einem ausgeschlossenen Gerät mit einer HID-Menübelegung kann daher eine Taste zusätzlich das Menü öffnen. Wird dieselbe physische Home-Taste auch über GameController gemeldet, kann das Menü zweimal umgeschaltet werden und dadurch scheinbar nicht reagieren. Welche Taste betroffen ist, hängt vom HID-Deskriptor und der gespeicherten bzw. geratenen Belegung ab.
 
@@ -160,7 +160,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 
 ### 10. [P2] Der Lernmodus kann gedrückte Eingaben im Core hängen lassen
 
-**Fundstelle:** `Ursprung/Emulation/HIDGamepadManager.swift:141–146` und `169–177`; ergänzend `Ursprung/Emulation/InputRouter.swift:159–160` · neue Controller-Unterstützung.
+**Fundstelle:** `Atrium/Emulation/HIDGamepadManager.swift:141–146` und `169–177`; ergänzend `Atrium/Emulation/InputRouter.swift:159–160` · neue Controller-Unterstützung.
 
 **Auslöser und Auswirkung:** Während des Lernens wird der Snapshot aktualisiert, aber die Funktion kehrt vor `onInput` zurück. Auch `cancelLearning` synchronisiert den Zustand nicht. Wird beispielsweise eine bereits im Spiel gehaltene Taste während des Lernens losgelassen und die Zuordnung anschließend abgebrochen, bleibt die Taste im Core bis zum nächsten weitergeleiteten Eingabeereignis gedrückt. Umgekehrt ist die dokumentierte Unterdrückung nicht vollständig: Ein Tastaturereignis oder ein anderer Controller kann `InputRouter.push()` auslösen, das den aktuellen Snapshot des gerade lernenden Pads trotzdem übernimmt.
 
@@ -171,7 +171,7 @@ P1 bezeichnet hohe Priorität wegen Datenverlust oder Prozessabsturz; P2 bezeich
 ### Durchgeführte Verifikation und Grenzen
 
 - Statische Prüfung des aktuellen Quellstands einschließlich der neuen, noch unversionierten Controller-Dateien. Weitere nicht aufgeführte Auffälligkeiten wurden nicht als bestätigte Findings aufgenommen.
-- Projekt und Test-Target in einer temporären Kopie ohne `.env` oder echte generierte Zugangsdaten erfolgreich mit Xcode 27.0, Ziel `platform=macOS,arch=arm64`, gebaut: `xcodebuild -project Ursprung.xcodeproj -scheme Ursprung -derivedDataPath build/DerivedData -destination 'platform=macOS,arch=arm64' build-for-testing -quiet` (Exit 0).
+- Projekt und Test-Target in einer temporären Kopie ohne `.env` oder echte generierte Zugangsdaten erfolgreich mit Xcode 27.0, Ziel `platform=macOS,arch=arm64`, gebaut: `xcodebuild -project Atrium.xcodeproj -scheme Atrium -derivedDataPath build/DerivedData -destination 'platform=macOS,arch=arm64' build-for-testing -quiet` (Exit 0).
 - Der erste Versuch mit `make test` scheiterte an Sandbox-Beschränkungen für Swift-Makros bzw. Xcode-Dienste. Der anschließende Build außerhalb dieser Sandbox war erfolgreich. Die vorhandene Testsuite wurde damit kompiliert, aber nicht erfolgreich ausgeführt; es wird kein bestandener Testlauf behauptet.
 - Separater ausführbarer ZIP-Reproduktionstest mit unverändertem Parser: gültiges Archiv erfolgreich gelesen, beschädigtes ZIP64-Zusatzfeld reproduzierbar mit `SIGTRAP` abgestürzt.
 - Die anderen Findings ergeben sich aus den angegebenen Daten- und Kontrollflüssen. Die beschriebenen Regressionstests sind Vorschläge und wurden nicht dem Projekt hinzugefügt. Keine praktischen Tests mit Controllern oder echten ROMs/Core-Downloads durchgeführt.

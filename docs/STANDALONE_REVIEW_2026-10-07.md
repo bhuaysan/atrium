@@ -8,7 +8,7 @@
 
 ## 1. P1 – Wiederherstellen kann den ausgewählten Spielstand endgültig löschen
 
-**Stelle:** [ARMSX2States.swift:148](../Ursprung/Emulation/ARMSX2States.swift#L148)
+**Stelle:** [ARMSX2States.swift:148](../Atrium/Emulation/ARMSX2States.swift#L148)
 
 Bei einer vollen Historie mit 20 Einträgen den ältesten Stand in einen belegten Slot zurückholen: `restore` archiviert zuerst den aktuellen Slot. Dabei begrenzt `archive` die Historie sofort wieder auf 20 Einträge und löscht genau den ausgewählten ältesten Stand. Das anschließende Verschieben dieser Datei schlägt fehl.
 
@@ -20,7 +20,7 @@ Bei einer vollen Historie mit 20 Einträgen den ältesten Stand in einen belegte
 
 ## 2. P1 – Ein Speicherauftrag kann nach dem Spielwechsel das falsche Spiel überschreiben
 
-**Stellen:** [EmulationSession.swift:1277](../Ursprung/Emulation/EmulationSession.swift#L1277), [ARMSX2States.swift:214](../Ursprung/Emulation/ARMSX2States.swift#L214)
+**Stellen:** [EmulationSession.swift:1277](../Atrium/Emulation/EmulationSession.swift#L1277), [ARMSX2States.swift:214](../Atrium/Emulation/ARMSX2States.swift#L214)
 
 Save-/Load-Tasks werden beim Beenden nicht abgewartet oder an die Session-Generation gebunden. Gleichzeitig kann das nächste Spiel denselben PINE-Socket-Pfad erhalten; jeder einzelne PINE-Aufruf baut eine neue Verbindung auf. Wechselt der Prozess zwischen Identitätsabfrage und Speicherbefehl, erreicht ein noch laufender Auftrag für Spiel A den Emulator von Spiel B.
 
@@ -32,11 +32,11 @@ Save-/Load-Tasks werden beim Beenden nicht abgewartet oder an die Session-Genera
 
 ## 3. P1 – Nach einem Rollback wird gegen die falsche Spielstand-Version geprüft
 
-**Stellen:** [EmulationSession.swift:600](../Ursprung/Emulation/EmulationSession.swift#L600), [EmulationSession.swift:528](../Ursprung/Emulation/EmulationSession.swift#L528), [EmulatorManager.swift:339](../Ursprung/Cores/EmulatorManager.swift#L339)
+**Stellen:** [EmulationSession.swift:600](../Atrium/Emulation/EmulationSession.swift#L600), [EmulationSession.swift:528](../Atrium/Emulation/EmulationSession.swift#L528), [EmulatorManager.swift:339](../Atrium/Cores/EmulatorManager.swift#L339)
 
 Die Versionsverwaltung kann eine ältere ARMSX2-Version starten. Resume, „Play from Here“ und PINE-Load prüfen jedoch weiterhin gegen `emulator.saveStateVersion` aus dem aktuellen Katalog-Pin. Die installierten Versionsdatensätze speichern keine eigene Formatversion.
 
-**Folge:** Sobald ein Pin-Wechsel das Spielstandsformat verändert, kann Ursprung nach einem Rollback einen für den alten Emulator zu neuen Stand freigeben. Damit versagt die Schutzprüfung vor dem im Plan dokumentierten Fehlerdialog-Absturz; umgekehrt können passende alte Stände abgewiesen werden.
+**Folge:** Sobald ein Pin-Wechsel das Spielstandsformat verändert, kann Atrium nach einem Rollback einen für den alten Emulator zu neuen Stand freigeben. Damit versagt die Schutzprüfung vor dem im Plan dokumentierten Fehlerdialog-Absturz; umgekehrt können passende alte Stände abgewiesen werden.
 
 **Nachweis:** Aus dem vollständigen Rollback-/Launch-Kontrollfluss belegt. Bedingter Fehler bei unterschiedlichen Formatversionen; kein Absturz mit zwei realen Emulator-Versionen reproduziert.
 

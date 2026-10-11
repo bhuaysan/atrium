@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Downloads the prebuilt MoltenVK dylib that Ursprung links and embeds, and
+# Downloads the prebuilt MoltenVK dylib that Atrium links and embeds, and
 # the Vulkan headers of the same release (see ThirdParty/moltenvk/README.md).
 # Neither is committed: this script fetches the pinned release, checks its
 # SHA-256 and thins the universal dylib to arm64. It does nothing when that
@@ -45,7 +45,7 @@ tar -xf "$STAGING/$ARCHIVE" -C "$STAGING" \
     MoltenVK/MoltenVK/include/vulkan MoltenVK/MoltenVK/include/vk_video MoltenVK/MoltenVK/include/MoltenVK
 DYLIB="$STAGING/MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib"
 
-# Ursprung runs on Apple Silicon only; the x86_64 half would double the size.
+# Atrium runs on Apple Silicon only; the x86_64 half would double the size.
 # The release already uses @rpath/libMoltenVK.dylib as install name.
 lipo -thin arm64 "$DYLIB" -output "$STAGING/libMoltenVK.dylib"
 codesign --force --sign - "$STAGING/libMoltenVK.dylib" 2>/dev/null

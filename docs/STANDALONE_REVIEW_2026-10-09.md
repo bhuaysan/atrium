@@ -25,7 +25,7 @@ P1 bedeutet hier: vor einem Release beheben, weil gespeicherter Fortschritt betr
 
 ## F1 — P1: Überholte Startvorbereitung schreibt weiterhin in die gemeinsame INI
 
-**Stellen:** [EmulationSession.swift:539](../Ursprung/Emulation/EmulationSession.swift#L539), [ARMSX2Launch.swift:103](../Ursprung/Emulation/ARMSX2Launch.swift#L103), [PCSX2Config.swift:188](../Ursprung/Emulation/PCSX2Config.swift#L188).
+**Stellen:** [EmulationSession.swift:539](../Atrium/Emulation/EmulationSession.swift#L539), [ARMSX2Launch.swift:103](../Atrium/Emulation/ARMSX2Launch.swift#L103), [PCSX2Config.swift:188](../Atrium/Emulation/PCSX2Config.swift#L188).
 
 **Auslöser:** Spiel A startet, während dessen Vorbereitung noch läuft wird Spiel B gestartet. Das ist über die Bibliothek möglich: Jeder Aufruf von `play` erzeugt einen eigenen Launch-Task. Besonders relevant ist eine verzögerte Dateiprüfung auf einem langsamen Datenträger.
 
@@ -38,7 +38,7 @@ Damit ist folgende Reihenfolge möglich:
 3. A schreibt danach seine Konfiguration in dieselbe Datei.
 4. Die Generation-Prüfung verwirft A erst nach diesem Schreibvorgang.
 
-**Folge:** Liest B die INI nach Schritt 3, verwendet es unter anderem den Memory-Card- und Savestate-Ordner von A. Ursprung überwacht weiterhin die Ordner von B. Auch spätere Einstellungsübernahmen können die falsche Konfiguration lesen. Das atomare Schreiben verhindert eine teilweise INI, aber nicht die falsche Reihenfolge vollständiger Dateien.
+**Folge:** Liest B die INI nach Schritt 3, verwendet es unter anderem den Memory-Card- und Savestate-Ordner von A. Atrium überwacht weiterhin die Ordner von B. Auch spätere Einstellungsübernahmen können die falsche Konfiguration lesen. Das atomare Schreiben verhindert eine teilweise INI, aber nicht die falsche Reihenfolge vollständiger Dateien.
 
 **Fix-Vorschlag:** Vorbereitung und Veröffentlichung trennen. BIOS-/Disc-/State-Prüfungen dürfen im Hintergrund laufen und ein Ergebnis liefern. Das Schreiben der gemeinsamen INI und der Prozessstart müssen exklusiv pro Emulator erfolgen, nach erneuter Generation-Prüfung. In diesem Abschnitt darf kein anderer Launch dazwischenkommen. Alternativ alte Vorbereitungen vollständig abwarten, bevor die nächste schreiben darf. Nur einen weiteren Cancellation-Check in `prepare` einzubauen schließt das Zeitfenster nicht zuverlässig.
 
@@ -48,9 +48,9 @@ Damit ist folgende Reihenfolge möglich:
 
 ## F2 — P1: Timeout entfernt eine Sicherung, obwohl der Save noch ankommen kann
 
-**Stellen:** [ARMSX2States.swift:235](../Ursprung/Emulation/ARMSX2States.swift#L235), [ARMSX2States.swift:325](../Ursprung/Emulation/ARMSX2States.swift#L325).
+**Stellen:** [ARMSX2States.swift:235](../Atrium/Emulation/ARMSX2States.swift#L235), [ARMSX2States.swift:325](../Atrium/Emulation/ARMSX2States.swift#L325).
 
-**Auslöser:** ARMSX2 bestätigt den Speicherbefehl, schreibt den neuen Slot aber erst nach Ursprungs Wartefrist. PINE bestätigt laut Plan lediglich das Einreihen des Auftrags; Ursprung kann den Auftrag anschließend nicht zurücknehmen.
+**Auslöser:** ARMSX2 bestätigt den Speicherbefehl, schreibt den neuen Slot aber erst nach Atriums Wartefrist. PINE bestätigt laut Plan lediglich das Einreihen des Auftrags; Atrium kann den Auftrag anschließend nicht zurücknehmen.
 
 Vor dem Befehl wird der bisherige Slot in die Historie kopiert. Bei Timeout oder einem anderen Fehler prüft `save` einmal den Änderungszeitpunkt. Ist der neue Stand noch nicht da, entfernt `unarchive` die Sicherungskopie. Ein später fertiggestellter Save überschreibt dann den bisherigen Slot ohne erhaltene Historie. Eine verlorene PINE-Antwort kann ebenfalls einen bereits angenommenen Auftrag als Fehler erscheinen lassen.
 
@@ -69,7 +69,7 @@ Die verkürzten Zeiten machen denselben Ablauf deterministisch; produktiv beträ
 
 ## F3 — P1: Restore und Speichern sind nicht gegeneinander gesperrt
 
-**Stellen:** [SaveStatesBrowser.swift:155](../Ursprung/UI/Library/SaveStatesBrowser.swift#L155), [SaveStatesBrowser.swift:218](../Ursprung/UI/Library/SaveStatesBrowser.swift#L218), [ARMSX2States.swift:154](../Ursprung/Emulation/ARMSX2States.swift#L154).
+**Stellen:** [SaveStatesBrowser.swift:155](../Atrium/UI/Library/SaveStatesBrowser.swift#L155), [SaveStatesBrowser.swift:218](../Atrium/UI/Library/SaveStatesBrowser.swift#L218), [ARMSX2States.swift:154](../Atrium/Emulation/ARMSX2States.swift#L154).
 
 **Auslöser:** In „Save States“ einen Save auslösen und vor dessen Fertigstellung einen historischen Stand in denselben Slot zurückholen. Der Save-Button berücksichtigt `canUseExternalStates`, Restore, Delete und Rename besitzen diese Sperre nicht. Restore ruft den Dateispeicher direkt auf.
 
@@ -83,13 +83,13 @@ Concurrent restore: slot= NEW SAVE selected history state preserved= false
 
 Zusätzlich kann der Restore allein den Änderungszeitpunkt erhöhen und damit die reine Zeitstempelprüfung des Saves verfrüht als erfolgreich erscheinen lassen.
 
-**Fix-Vorschlag:** Alle von Ursprung ausgelösten Mutationen des State-Ordners über dieselbe Operationsverwaltung führen. Restore/Delete/Rename müssen während laufender oder ungeklärter Save-/Load-Aufträge gesperrt oder eingereiht werden, einschließlich bereits geöffneter Bestätigungsdialoge. Für die kleinste robuste Änderung Restore während einer aktiven Standalone-Session deaktivieren: ARMSX2s eigene Hotkeys schreiben unabhängig von Ursprungs Busy-Flag. Eine weitergehende Lösung muss auch diese externen Änderungen berücksichtigen.
+**Fix-Vorschlag:** Alle von Atrium ausgelösten Mutationen des State-Ordners über dieselbe Operationsverwaltung führen. Restore/Delete/Rename müssen während laufender oder ungeklärter Save-/Load-Aufträge gesperrt oder eingereiht werden, einschließlich bereits geöffneter Bestätigungsdialoge. Für die kleinste robuste Änderung Restore während einer aktiven Standalone-Session deaktivieren: ARMSX2s eigene Hotkeys schreiben unabhängig von Atriums Busy-Flag. Eine weitergehende Lösung muss auch diese externen Änderungen berücksichtigen.
 
 **Regressionstest:** Save nach Befehlsannahme pausieren, Restore desselben Slots anfordern, Save fertigstellen. Beide zuvor vorhandenen Inhalte müssen erhalten bleiben beziehungsweise Restore muss nachvollziehbar abgewiesen werden. Die UI-Sperre und den Schutz im Service separat prüfen.
 
 ## F4 — P2: Versionsnummer wird mit vollständiger Ladbarkeit gleichgesetzt
 
-**Stellen:** [ARMSX2States.swift:188](../Ursprung/Emulation/ARMSX2States.swift#L188), [ARMSX2States.swift:203](../Ursprung/Emulation/ARMSX2States.swift#L203), [ARMSX2Launch.swift:127](../Ursprung/Emulation/ARMSX2Launch.swift#L127).
+**Stellen:** [ARMSX2States.swift:188](../Atrium/Emulation/ARMSX2States.swift#L188), [ARMSX2States.swift:203](../Atrium/Emulation/ARMSX2States.swift#L203), [ARMSX2Launch.swift:127](../Atrium/Emulation/ARMSX2Launch.swift#L127).
 
 **Auslöser:** Ein beschädigter oder unvollständiger Spielstand hat noch einen lesbaren, kompatiblen Versionseintrag. `isLoadable` prüft ausschließlich diesen ZIP-Eintrag und die Versionsnummer.
 
@@ -105,7 +105,7 @@ Der gepinnte Emulator verlangt beim tatsächlichen Laden unter anderem `PCSX2 In
 
 ## F5 — P2: Erkannte Disc-Deskriptoren und Archive werden nicht für ARMSX2 aufgelöst
 
-**Stellen:** [LibraryScanner.swift:186](../Ursprung/Library/LibraryScanner.swift#L186), [LibraryScanner.swift:255](../Ursprung/Library/LibraryScanner.swift#L255), [ARMSX2Launch.swift:145](../Ursprung/Emulation/ARMSX2Launch.swift#L145), [LibraryView.swift:933](../Ursprung/UI/Library/LibraryView.swift#L933).
+**Stellen:** [LibraryScanner.swift:186](../Atrium/Library/LibraryScanner.swift#L186), [LibraryScanner.swift:255](../Atrium/Library/LibraryScanner.swift#L255), [ARMSX2Launch.swift:145](../Atrium/Emulation/ARMSX2Launch.swift#L145), [LibraryView.swift:933](../Atrium/UI/Library/LibraryView.swift#L933).
 
 **Auslöser:** Ein PS2-Spiel liegt als CUE/BIN, M3U mit mehreren Images oder ZIP vor. Scanner und Disc-Menü behandeln PS2 wie die übrigen Disc-Systeme. Referenzierte BIN-/ISO-Dateien werden als eigene Bibliothekseinträge ausgeblendet.
 
@@ -121,7 +121,7 @@ Der Standalone-Launch übergibt jedoch `game.fileURL` unverändert. Die Content-
 
 ## F6 — P2: Nach dem Löschen des neuesten Resume-Stands wird ein älterer wieder aktiv
 
-**Stelle:** [ARMSX2States.swift:338](../Ursprung/Emulation/ARMSX2States.swift#L338).
+**Stelle:** [ARMSX2States.swift:338](../Atrium/Emulation/ARMSX2States.swift#L338).
 
 **Auslöser:** Ein Spielordner enthält mehrere reguläre `.resume.p2s`, beispielsweise nach dem Zusammenführen von Bibliothekseinträgen unterschiedlicher Discs/Revisionen. Das Dateimodell sieht mehrere Resume-Dateien ausdrücklich vor. Anschließend endet eine Session sauber ohne neuen Resume-Stand, etwa über den Schließen-Button von ARMSX2.
 
@@ -137,11 +137,11 @@ Der Standalone-Launch übergibt jedoch `game.fileURL` unverändert. Die Content-
 
 ## Weitere Verbesserungsmöglichkeiten
 
-1. **Kompatibilität vor der Aktion zeigen.** [LibraryView.swift:855](../Ursprung/UI/Library/LibraryView.swift#L855) berechnet „Resume“ nur aus der Existenz einer Datei. Der Browser erlaubt „Play from Here“ anhand der Core-ID. Nach einem Rollback können beide Aktionen einen inkompatiblen Stand anbieten; Resume startet dann still von vorn. Die Formatversion der tatsächlich aktiven Installation schon für diese Anzeige nutzen. Inkompatible Stände sichtbar, aber deaktiviert mit Grund darstellen. Das erhält die Daten und vermeidet die im Plan erwähnte irreführende Verfügbarkeit.
+1. **Kompatibilität vor der Aktion zeigen.** [LibraryView.swift:855](../Atrium/UI/Library/LibraryView.swift#L855) berechnet „Resume“ nur aus der Existenz einer Datei. Der Browser erlaubt „Play from Here“ anhand der Core-ID. Nach einem Rollback können beide Aktionen einen inkompatiblen Stand anbieten; Resume startet dann still von vorn. Die Formatversion der tatsächlich aktiven Installation schon für diese Anzeige nutzen. Inkompatible Stände sichtbar, aber deaktiviert mit Grund darstellen. Das erhält die Daten und vermeidet die im Plan erwähnte irreführende Verfügbarkeit.
 
-2. **Externe State-Änderungen beobachten.** [SaveStatesBrowser.swift:86](../Ursprung/UI/Library/SaveStatesBrowser.swift#L86) lädt beim Öffnen und bei Änderungen von `session.slots` neu. ARMSX2-Hotkeys aktualisieren diese Property nicht. Ein Beobachter für den State-Ordner oder eine Aktualisierung beim Aktivieren der Bibliothek würde extern erzeugte Saves und Thumbnails zeitnah anzeigen. `.part` weiterhin ignorieren und Ereignisse bündeln.
+2. **Externe State-Änderungen beobachten.** [SaveStatesBrowser.swift:86](../Atrium/UI/Library/SaveStatesBrowser.swift#L86) lädt beim Öffnen und bei Änderungen von `session.slots` neu. ARMSX2-Hotkeys aktualisieren diese Property nicht. Ein Beobachter für den State-Ordner oder eine Aktualisierung beim Aktivieren der Bibliothek würde extern erzeugte Saves und Thumbnails zeitnah anzeigen. `.part` weiterhin ignorieren und Ereignisse bündeln.
 
-3. **Wiederherstellungs- und Persistenzfehler anzeigen.** Restore verschluckt Fehler mit `try?` im Browser; [EmulatorManager.swift:211](../Ursprung/Cores/EmulatorManager.swift#L211) tut dasselbe beim Speichern von `versions.json`. Ein fehlgeschlagener Restore sollte eine konkrete Meldung erhalten. Versionswechsel erst nach erfolgreicher Persistenz als abgeschlossen ausweisen; bei einem Fehler den vorherigen Zustand erhalten. Das verhindert, dass ein Rollback nur bis zum nächsten App-Start zu gelten scheint.
+3. **Wiederherstellungs- und Persistenzfehler anzeigen.** Restore verschluckt Fehler mit `try?` im Browser; [EmulatorManager.swift:211](../Atrium/Cores/EmulatorManager.swift#L211) tut dasselbe beim Speichern von `versions.json`. Ein fehlgeschlagener Restore sollte eine konkrete Meldung erhalten. Versionswechsel erst nach erfolgreicher Persistenz als abgeschlossen ausweisen; bei einem Fehler den vorherigen Zustand erhalten. Das verhindert, dass ein Rollback nur bis zum nächsten App-Start zu gelten scheint.
 
 4. **Temporäre Ordner auch bei abgebrochenen Starts entfernen.** `ARMSX2Launch.prepare` legt den PINE-Ordner an, bevor sämtliche Prüfungen abgeschlossen sind. Die aktuelle Entfernung hängt am Prozessende. Ungültige gewählte States, ein fehlgeschlagener Prozessstart oder eine überholte Vorbereitung können daher Ordner zurücklassen. Die vorbereitete Ressource bis zur erfolgreichen Übergabe an `ExternalSession` über einen eindeutigen Besitzer mit Fehlerbereinigung verwalten.
 
@@ -190,6 +190,6 @@ Weitere Verbesserungen:
 
 Offen bleiben außerdem: Ein Save nach einem Timeout kann weiterhin mit dem noch ausstehenden ARMSX2-Auftrag konkurrieren (es geht nur ein unbestätigter State verloren, keine Historie). F6 bindet den automatischen Kandidaten nicht an die Disc-Identität.
 
-**Tests:** 438 Tests in 95 Suites: 436 bestanden, zwei übersprungen (`SlangPresetTests/everyPackPresetRoundTrips`, `ShaderLibraryTests/realPackUnpacksAndIndexes`, beide brauchen `URSPRUNG_SHADER_PACK`), keiner fehlgeschlagen (`xcodebuild test`, macOS arm64). Mit echtem ARMSX2 wurde nicht live geprüft.
+**Tests:** 438 Tests in 95 Suites: 436 bestanden, zwei übersprungen (`SlangPresetTests/everyPackPresetRoundTrips`, `ShaderLibraryTests/realPackUnpacksAndIndexes`, beide brauchen `ATRIUM_SHADER_PACK`), keiner fehlgeschlagen (`xcodebuild test`, macOS arm64). Mit echtem ARMSX2 wurde nicht live geprüft.
 
 Nachträge aus dem [Re-Review](STANDALONE_REREVIEW_2026-10-09.md): R1–R3 und die Log-Datei aus F1 sind dort im Abschnitt „Umsetzung“ beschrieben.

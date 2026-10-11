@@ -1,4 +1,4 @@
-# Feature-Evaluation: Ursprung
+# Feature-Evaluation: Atrium
 
 Stand: 30. September 2026. Bewertet wurde der aktuelle lokale Arbeitsstand einschließlich geänderter und noch unversionierter Dateien.
 
@@ -33,7 +33,7 @@ Die Architektur bietet dafür brauchbare Ansatzpunkte: Services sind von den Vie
 | Spielstände | Quick Save/Load; neun weitere Slots; Vorschaubilder; Löschen; Batteriespielstände pro Spiel-ID; SRAM-Sicherung ungefähr alle zehn Sekunden und beim Entladen | `EmulationSession.swift:354`, `PauseMenuView.swift:133`, `BatterySave.swift:12`, `UREmulationRunner.m:137`, `URLibretroCore.m:352` |
 | Eingabe | Tastatur mit frei belegbaren RetroPad-Tasten; GameController, XInput und HID; bis zu vier Ports; HID-Belegung; Maus als Pointer; Home-Taste öffnet das Spielmenü | `InputRouter.swift:56`, `ControlsSettingsView.swift:14`, `GameMetalView.swift:88` |
 | BIOS und Datenbank | BIOS-Import per Dateiauswahl/Drag-and-drop, Prüfsummen und Statusanzeigen; kontrollierter Datenbank-Neustart mit Sicherung bei Öffnungsfehler | `BIOSSettingsView.swift:12`, `BIOSManager.swift:41`, `LibraryDatabase.swift:57` |
-| Projektqualität | Unit-Tests für Scanner, ZIP, Datenbank-Recovery, Core-Installation, Batteriesave-Pfade und Eingabe-Helfer; CI-Konfiguration; Smoke-Harness | `UrsprungTests/`, `.github/workflows/ci.yml`, `Tools/ursprung-smoke/main.m` |
+| Projektqualität | Unit-Tests für Scanner, ZIP, Datenbank-Recovery, Core-Installation, Batteriesave-Pfade und Eingabe-Helfer; CI-Konfiguration; Smoke-Harness | `AtriumTests/`, `.github/workflows/ci.yml`, `Tools/atrium-smoke/main.m` |
 
 ## Must-haves vor Version 1.0
 
@@ -99,7 +99,7 @@ Benötigt werden ein eigener Autosave-Bereich, optional periodische States, „F
 
 Die vorhandene Datenbank-Sicherung ist ein Fehlerbehandlungspfad, kein vollständiges Backup. In den Einstellungen lassen sich Daten- und Save-Ordner nur im Finder öffnen (`SettingsView.swift:71`). Bibliothek, States, Batteriesaves, Core-eigene Speicherdateien und Einstellungen liegen an unterschiedlichen Orten beziehungsweise teilweise in `UserDefaults` (`AppPaths.swift:7`, `Preferences.swift:42`).
 
-Benötigt werden versionierter Export/Import mit Vorschau, Wiederherstellung der Spielzuordnungen, Import vorhandener Batteriesaves und dokumentierte State-Kompatibilität. Passwörter gehören nicht ungeschützt in einen Export. Für Datenmodell-Erweiterungen sollte ein expliziter Schema-/Migrationspfad eingeführt werden; aktuell wird direkt `ModelContainer(for: Game.self, ...)` angelegt (`UrsprungApp.swift:43`).
+Benötigt werden versionierter Export/Import mit Vorschau, Wiederherstellung der Spielzuordnungen, Import vorhandener Batteriesaves und dokumentierte State-Kompatibilität. Passwörter gehören nicht ungeschützt in einen Export. Für Datenmodell-Erweiterungen sollte ein expliziter Schema-/Migrationspfad eingeführt werden; aktuell wird direkt `ModelContainer(for: Game.self, ...)` angelegt (`AtriumApp.swift:43`).
 
 **Abnahme:** Sicherung in eine leere Installation einspielen und Favoriten, Historie, Spielzuordnungen, Speicherstände und relevante Einstellungen wiederfinden. Unvollständige Sicherungen überschreiben vorhandene Daten nicht stillschweigend. Abhängigkeit: M1 und M2.
 

@@ -1,4 +1,4 @@
-name: Ursprung
+name: Atrium
 options:
   bundleIdPrefix: io.github.bhuaysan
   deploymentTarget:
@@ -27,21 +27,21 @@ settings:
     DEVELOPMENT_TEAM: ""
 
 targets:
-  Ursprung:
+  Atrium:
     type: application
     platform: macOS
     configFiles:
-      Debug: Config/Ursprung.xcconfig
-      Release: Config/Ursprung.xcconfig
+      Debug: Config/Atrium.xcconfig
+      Release: Config/Atrium.xcconfig
     sources:
-      - path: Ursprung
+      - path: Atrium
         excludes:
           - "**/.DS_Store"
           - Bridge/URPixelConversion.c
-      - path: Ursprung/Support/Secrets.generated.swift
+      - path: Atrium/Support/Secrets.generated.swift
         optional: true
       # Converts every frame of Vulkan cores: optimised in Debug builds too.
-      - path: Ursprung/Bridge/URPixelConversion.c
+      - path: Atrium/Bridge/URPixelConversion.c
         compilerFlags: ["-O2"]
       # RetroAchievements runtime (MIT), see ThirdParty/rcheevos/README.md.
       - path: ThirdParty/rcheevos/src
@@ -50,12 +50,12 @@ targets:
           - "**/*.h"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.bhuaysan.Ursprung
-        PRODUCT_NAME: Ursprung
-        INFOPLIST_FILE: Ursprung/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Ursprung/Ursprung.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.bhuaysan.Atrium
+        PRODUCT_NAME: Atrium
+        INFOPLIST_FILE: Atrium/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Atrium/Atrium.entitlements
         ENABLE_HARDENED_RUNTIME: YES
-        SWIFT_OBJC_BRIDGING_HEADER: Ursprung/Bridge/Ursprung-Bridging-Header.h
+        SWIFT_OBJC_BRIDGING_HEADER: Atrium/Bridge/Atrium-Bridging-Header.h
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         MARKETING_VERSION: "0.1.0"
@@ -64,7 +64,7 @@ targets:
                                        "RC_CLIENT_SUPPORTS_HASH=1", "RC_HASH_NO_ENCRYPTED=1"]
         HEADER_SEARCH_PATHS: ["$(SRCROOT)/ThirdParty/rcheevos/include", "$(SRCROOT)/ThirdParty/rcheevos/src",
                              "$(SRCROOT)/ThirdParty/librashader/include", "$(SRCROOT)/ThirdParty/moltenvk/include",
-                             "$(SRCROOT)/Ursprung/Bridge"]
+                             "$(SRCROOT)/Atrium/Bridge"]
         LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(SRCROOT)/ThirdParty/librashader/lib", "$(SRCROOT)/ThirdParty/moltenvk/lib"]
         OTHER_LDFLAGS: ["$(inherited)", "-lz", "-lcompression"]
         LOCALIZATION_PREFERS_STRING_CATALOGS: YES
@@ -91,11 +91,11 @@ targets:
     preBuildScripts:
       - name: Generate ScreenScraper secrets
         script: |
-          "${SRCROOT}/Scripts/generate-secrets.sh" "${SRCROOT}/.env" "${SRCROOT}/Ursprung/Support/Secrets.generated.swift"
+          "${SRCROOT}/Scripts/generate-secrets.sh" "${SRCROOT}/.env" "${SRCROOT}/Atrium/Support/Secrets.generated.swift"
         inputFiles:
           - $(SRCROOT)/Scripts/generate-secrets.sh
         outputFiles:
-          - $(SRCROOT)/Ursprung/Support/Secrets.generated.swift
+          - $(SRCROOT)/Atrium/Support/Secrets.generated.swift
         basedOnDependencyAnalysis: false
     postBuildScripts:
       # Dolphin dlopens "libvulkan.1.dylib" at boot; dyld finds this link
@@ -108,15 +108,15 @@ targets:
           - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libvulkan.1.dylib
         basedOnDependencyAnalysis: false
 
-  UrsprungTests:
+  AtriumTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: UrsprungTests
+      - path: AtriumTests
     dependencies:
-      - target: Ursprung
+      - target: Atrium
       # Loaded with dlopen like a downloaded core, so copied, not linked.
-      - target: ursprung-test-core
+      - target: atrium-test-core
         link: false
         embed: true
         copy:
@@ -124,39 +124,39 @@ targets:
     settings:
       base:
         BUNDLE_LOADER: $(TEST_HOST)
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Ursprung.app/Contents/MacOS/Ursprung
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.bhuaysan.UrsprungTests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Atrium.app/Contents/MacOS/Atrium
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.bhuaysan.AtriumTests
         GENERATE_INFOPLIST_FILE: YES
 
-  # A libretro core for the tests (UrsprungTests/EmulationRunnerTests.swift).
-  ursprung-test-core:
+  # A libretro core for the tests (AtriumTests/EmulationRunnerTests.swift).
+  atrium-test-core:
     type: library.dynamic
     platform: macOS
     sources:
-      - path: Tools/ursprung-test-core
+      - path: Tools/atrium-test-core
     settings:
       base:
-        PRODUCT_NAME: ursprung-test-core
+        PRODUCT_NAME: atrium-test-core
         EXECUTABLE_PREFIX: ""
-        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Ursprung/Bridge", "$(SRCROOT)/ThirdParty/moltenvk/include"]
+        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Atrium/Bridge", "$(SRCROOT)/ThirdParty/moltenvk/include"]
         SKIP_INSTALL: YES
 
-  ursprung-smoke:
+  atrium-smoke:
     type: tool
     platform: macOS
     sources:
-      - path: Tools/ursprung-smoke
-      - path: Ursprung/Bridge/URLibretroCore.m
-      - path: Ursprung/Bridge/URGLContext.m
-      - path: Ursprung/Bridge/URVulkanContext.m
-      - path: Ursprung/Bridge/URPixelConversion.c
+      - path: Tools/atrium-smoke
+      - path: Atrium/Bridge/URLibretroCore.m
+      - path: Atrium/Bridge/URGLContext.m
+      - path: Atrium/Bridge/URVulkanContext.m
+      - path: Atrium/Bridge/URPixelConversion.c
         compilerFlags: ["-O2"]
-      - path: Ursprung/Bridge/URAudioRing.c
-      - path: Ursprung/Bridge/URShaderChain.m
-      - path: Ursprung/Bridge/URShaderPreset.m
+      - path: Atrium/Bridge/URAudioRing.c
+      - path: Atrium/Bridge/URShaderChain.m
+      - path: Atrium/Bridge/URShaderPreset.m
     settings:
       base:
-        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Ursprung/Bridge", "$(SRCROOT)/ThirdParty/librashader/include",
+        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Atrium/Bridge", "$(SRCROOT)/ThirdParty/librashader/include",
                              "$(SRCROOT)/ThirdParty/moltenvk/include"]
         LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(SRCROOT)/ThirdParty/librashader/lib", "$(SRCROOT)/ThirdParty/moltenvk/lib"]
         LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "$(SRCROOT)/ThirdParty/librashader/lib", "$(SRCROOT)/ThirdParty/moltenvk/lib"]
@@ -173,21 +173,21 @@ targets:
       - sdk: QuartzCore.framework
 
 schemes:
-  ursprung-smoke:
+  atrium-smoke:
     build:
       targets:
-        ursprung-smoke: all
-  Ursprung:
+        atrium-smoke: all
+  Atrium:
     build:
       targets:
-        Ursprung: all
-        UrsprungTests: [test]
+        Atrium: all
+        AtriumTests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
-        - UrsprungTests
+        - AtriumTests
     profile:
       config: Release
     archive:

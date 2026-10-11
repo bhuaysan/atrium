@@ -1,14 +1,14 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Builds a signed, notarized Ursprung disk image for people without Xcode.
+# Builds a signed, notarized Atrium disk image for people without Xcode.
 # Usage: Scripts/dist.sh   (or: make dist)
 #
 # Needs, once:
 #   - a "Developer ID Application" certificate in the login keychain
 #     (Apple Developer Program, Xcode › Settings › Accounts › Manage Certificates)
 #   - a notarytool keychain profile:
-#       xcrun notarytool store-credentials ursprung-notary \
+#       xcrun notarytool store-credentials atrium-notary \
 #           --apple-id <apple id> --team-id <team id> --password <app-specific password>
 #   - .env with the ScreenScraper developer credentials (see README): end
 #     users cannot add them, so a release without them cannot fetch metadata.
@@ -16,7 +16,7 @@
 # Environment:
 #   SIGN_IDENTITY   code signing identity (default: the first Developer ID Application)
 #   TEAM_ID         team ID (default: taken from the identity)
-#   NOTARY_PROFILE  notarytool keychain profile (default: ursprung-notary)
+#   NOTARY_PROFILE  notarytool keychain profile (default: atrium-notary)
 #   SKIP_NOTARIZE=1 build and package only, e.g. to test this script; the
 #                   result is not for distribution
 set -eu
@@ -24,7 +24,7 @@ cd "$(dirname "$0")/.."
 
 DERIVED_DATA="${DERIVED_DATA:-build/DerivedData}"
 DIST="build/dist"
-NOTARY_PROFILE="${NOTARY_PROFILE:-ursprung-notary}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-atrium-notary}"
 
 fail() { echo "error: $*" >&2; exit 1; }
 
@@ -50,19 +50,19 @@ if ! has_credential SCREENSCRAPER_DEV_ID || ! has_credential SCREENSCRAPER_DEV_P
 fi
 
 echo "› Building Release, signed by $SIGN_IDENTITY"
-./Scripts/generate-secrets.sh .env Ursprung/Support/Secrets.generated.swift
+./Scripts/generate-secrets.sh .env Atrium/Support/Secrets.generated.swift
 ./Scripts/fetch-librashader.sh
 ./Scripts/fetch-moltenvk.sh
 xcodegen generate --quiet
-xcodebuild -project Ursprung.xcodeproj -scheme Ursprung -configuration Release \
+xcodebuild -project Atrium.xcodeproj -scheme Atrium -configuration Release \
     -derivedDataPath "$DERIVED_DATA" -destination 'platform=macOS,arch=arm64' \
     CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGN_IDENTITY" DEVELOPMENT_TEAM="$TEAM_ID" \
     OTHER_CODE_SIGN_FLAGS="--timestamp" CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
     build -quiet
 
-APP="$DERIVED_DATA/Build/Products/Release/Ursprung.app"
+APP="$DERIVED_DATA/Build/Products/Release/Atrium.app"
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
-echo "› Verifying the signature of Ursprung $VERSION"
+echo "› Verifying the signature of Atrium $VERSION"
 codesign --verify --deep --strict --verbose=1 "$APP"
 codesign -d --entitlements - "$APP" 2>/dev/null | grep -q "com.apple.security.get-task-allow" \
     && fail "the app carries get-task-allow (a debug entitlement); notarization would reject it."
@@ -71,9 +71,9 @@ rm -rf "$DIST"
 mkdir -p "$DIST/image"
 cp -R "$APP" "$DIST/image/"
 ln -s /Applications "$DIST/image/Applications"
-DMG="$DIST/Ursprung-$VERSION.dmg"
+DMG="$DIST/Atrium-$VERSION.dmg"
 echo "› Creating $DMG"
-hdiutil create -quiet -volname "Ursprung $VERSION" -srcfolder "$DIST/image" -fs APFS -format UDZO "$DMG"
+hdiutil create -quiet -volname "Atrium $VERSION" -srcfolder "$DIST/image" -fs APFS -format UDZO "$DMG"
 codesign --sign "$SIGN_IDENTITY" --timestamp "$DMG"
 rm -rf "$DIST/image"
 

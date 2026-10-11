@@ -23,7 +23,7 @@ BIOS/
 # Generated secrets
 **/Secrets.generated.swift
 
-# Local code signing (see Config/Ursprung.xcconfig)
+# Local code signing (see Config/Atrium.xcconfig)
 Config/Signing.local.xcconfig
 
 # macOS

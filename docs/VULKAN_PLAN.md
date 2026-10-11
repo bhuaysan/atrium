@@ -1,8 +1,8 @@
-# Ursprung — Vulkan Hardware Rendering through MoltenVK: Plan
+# Atrium — Vulkan Hardware Rendering through MoltenVK: Plan
 
 7 October 2026 · based on commit 2b278e1 (main). Status: questions resolved (7 October 2026); spike and phases 1–4 done on branch `feature/vulkan` (8 October 2026); phase 5 not needed for now (S3); phase 6 blocked on test content. Comes after `docs/STANDALONE_PLAN.md` (Q6).
 
-Ursprung gives libretro cores an OpenGL 4.1 context (`URGLContext`) and nothing else. `SET_HW_RENDER` refuses Vulkan, and `GET_PREFERRED_HW_RENDER` answers OpenGL core. This plan adds a Vulkan context through MoltenVK, so cores can use their Vulkan renderers. The result still goes through Ursprung's Metal presentation, shaders, screenshots and save states.
+Atrium gives libretro cores an OpenGL 4.1 context (`URGLContext`) and nothing else. `SET_HW_RENDER` refuses Vulkan, and `GET_PREFERRED_HW_RENDER` answers OpenGL core. This plan adds a Vulkan context through MoltenVK, so cores can use their Vulkan renderers. The result still goes through Atrium's Metal presentation, shaders, screenshots and save states.
 
 Acceptance is defined by two systems that gain the most: **N64** (paraLLEl-RDP instead of the angrylion software renderer) and **GameCube/Wii** (Dolphin's Vulkan backend instead of Apple's OpenGL).
 
@@ -14,15 +14,15 @@ Acceptance is defined by two systems that gain the most: **N64** (paraLLEl-RDP i
 | Frame handoff, first version | Read back into the existing CPU frame buffer, like the GL path. Shaders, screenshots, rewind, autosave thumbnails and the smoke tool work unchanged |
 | Frame handoff, later | Zero-copy into a Metal texture through `VK_EXT_metal_objects` (phase 5) |
 | API per core | `CoreDefinition.renderer` (`.opengl` default, `.vulkan`) drives `GET_PREFERRED_HW_RENDER` and option defaults. Users can override it per core (Automatic / Vulkan / OpenGL) |
-| Fallback | If MoltenVK or device creation fails, `SET_HW_RENDER` returns false and the core uses its OpenGL or software path. Ursprung shows a toast once |
+| Fallback | If MoltenVK or device creation fails, `SET_HW_RENDER` returns false and the core uses its OpenGL or software path. Atrium shows a toast once |
 | Systems in scope | N64, GameCube/Wii (acceptance); Dreamcast and PlayStation (defaults after the spike); PSP stays on OpenGL unless the spike shows a gain |
-| Out of scope | PS2 (LRPS2 hangs regardless of renderer, see `docs/STANDALONE_PLAN.md`), Wii U (Cemu), Vulkan for Ursprung's own rendering, librashader's Vulkan runtime |
+| Out of scope | PS2 (LRPS2 hangs regardless of renderer, see `docs/STANDALONE_PLAN.md`), Wii U (Cemu), Vulkan for Atrium's own rendering, librashader's Vulkan runtime |
 
 ## Background
 
 ### Test results (7 October 2026)
 
-There was no Vulkan support in Ursprung to test with. The tests used the official RetroArch 1.22.2 (MoltenVK 1.3.0), copied to a scratch folder with its own config, on an Apple M4, with buildbot cores (macOS arm64, 6 October). Each run lasted 30–45 s.
+There was no Vulkan support in Atrium to test with. The tests used the official RetroArch 1.22.2 (MoltenVK 1.3.0), copied to a scratch folder with its own config, on an Apple M4, with buildbot cores (macOS arm64, 6 October). Each run lasted 30–45 s.
 
 | System | Core / renderer | Game | Result |
 |---|---|---|---|
@@ -37,7 +37,7 @@ There was no Vulkan support in Ursprung to test with. The tests used the officia
 
 All runs quit cleanly on SIGTERM. MoltenVK logs `VK_ERROR_FEATURE_NOT_PRESENT: Metal does not support disabling primitive restart` for paraLLEl-GS; the others ran without MoltenVK warnings in the filtered log.
 
-For comparison, Dolphin through Ursprung's OpenGL path (`ursprung-smoke`, same game) reaches the menu but shows *"Your OpenGL driver does not support ARB_buffer_storage"* and *"This device's performance may be poor"*.
+For comparison, Dolphin through Atrium's OpenGL path (`atrium-smoke`, same game) reaches the menu but shows *"Your OpenGL driver does not support ARB_buffer_storage"* and *"This device's performance may be poor"*.
 
 ### What each system gains
 
@@ -59,12 +59,12 @@ For comparison, Dolphin through Ursprung's OpenGL path (`ursprung-smoke`, same g
 - Some cores submit from their own threads (Dolphin, PPSSPP, LRPS2) and rely on `lock_queue`.
 - The header is `libretro_vulkan.h` from libretro-common (MIT). RetroArch's `gfx/drivers/vulkan.c` and `gfx/common/vulkan_common.c` are the reference implementation (GPL-3.0-or-later, compatible).
 
-### Ursprung today
+### Atrium today
 
 - `URLibretroCore` answers `GET_PREFERRED_HW_RENDER` with `RETRO_HW_CONTEXT_OPENGL_CORE`, creates `URGLContext` in `SET_HW_RENDER`, and returns false for every other context type and for the negotiation and interface environment calls.
 - `URCoreVideoRefresh` reads a GL frame back with `readPixelsWidth:height:bottomLeftOrigin:destination:` into `_back` (BGRA8, CPU) and publishes it. `MetalRenderer` uploads it into a texture once per new `frameSerial`; shaders, screenshots, rewind and thumbnails all start from that buffer.
 - All `retro_*` calls run on the `UREmulationRunner` thread. `unloadGame` calls `context_destroy`, then `unload_game`, then `deinit` (same order as RetroArch).
-- `ursprung-smoke` links the same bridge, so a Vulkan path in `URLibretroCore` is testable headlessly with `make smoke`.
+- `atrium-smoke` links the same bridge, so a Vulkan path in `URLibretroCore` is testable headlessly with `make smoke`.
 
 ## Architecture
 
@@ -84,7 +84,7 @@ For comparison, Dolphin through Ursprung's OpenGL path (`ursprung-smoke`, same g
 
 ### Bridge
 
-- `URVulkanContext` (Objective-C, `Ursprung/Bridge/`), parallel to `URGLContext`:
+- `URVulkanContext` (Objective-C, `Atrium/Bridge/`), parallel to `URGLContext`:
   - `-initWithNegotiation:(const struct retro_hw_render_context_negotiation_interface_vulkan *)…`: creates the instance (application info from the core if given, `VK_KHR_portability_enumeration` not needed without a loader), picks the Apple GPU, calls the core's `create_device`/`create_device2` or creates a default device with one graphics+compute queue. If the device exposes `VK_KHR_portability_subset`, it is enabled.
   - Implements `retro_hw_render_interface_vulkan` with C trampolines (like the other `URCore*` callbacks) and a queue mutex for `lock_queue`.
   - Per sync index: a command buffer, a fence and a readback buffer (`HOST_VISIBLE | HOST_COHERENT`), sized to `max_width × max_height × 4`.
@@ -99,7 +99,7 @@ For comparison, Dolphin through Ursprung's OpenGL path (`ursprung-smoke`, same g
 
 ### Model and settings
 
-- `CoreDefinition.renderer: HardwareRenderer` (`.opengl` default, `.vulkan`). It is what Ursprung asks the core for. A Vulkan core keeps working on GL when Vulkan is unavailable, because the core falls back itself.
+- `CoreDefinition.renderer: HardwareRenderer` (`.opengl` default, `.vulkan`). It is what Atrium asks the core for. A Vulkan core keeps working on GL when Vulkan is unavailable, because the core falls back itself.
 - `Preferences.rendererChoice(for coreID:)`: `automatic` (catalog value), `vulkan`, `opengl`. Settings › Cores shows it only for cores whose catalog entry has Vulkan.
 - Option defaults move with the renderer (applied only when the resolved renderer is Vulkan):
   - `mupen64plus_next`: `mupen64plus-rdp-plugin = parallel`, `mupen64plus-rsp-plugin = parallel`
@@ -115,10 +115,10 @@ Effort as in FEATURE_EVALUATION: S = local change, M = several components, L = n
 
 ### Phase 0 — Spike (S–M, throwaway branch)
 
-Add a minimal Vulkan context to `ursprung-smoke` only (readback, one sync index, no negotiation v2 if not needed). Run Mupen64Plus-Next (paraLLEl-RDP), Dolphin, Flycast and SwanStation against the user's games and write `smoke.png`. Answer:
+Add a minimal Vulkan context to `atrium-smoke` only (readback, one sync index, no negotiation v2 if not needed). Run Mupen64Plus-Next (paraLLEl-RDP), Dolphin, Flycast and SwanStation against the user's games and write `smoke.png`. Answer:
 
 - **S1** Which negotiation versions and callbacks do these four cores use? Which device extensions and features do they request, and does MoltenVK 1.4.2 grant them?
-- **S2** Speed: frames per second uncapped for Ocarina of Time (paraLLEl-RDP, 1× and 2×) and the Dolphin intro, compared with angrylion and Dolphin on GL in `ursprung-smoke`.
+- **S2** Speed: frames per second uncapped for Ocarina of Time (paraLLEl-RDP, 1× and 2×) and the Dolphin intro, compared with angrylion and Dolphin on GL in `atrium-smoke`.
 - **S3** Readback cost at 1×, 2×, 4× internal resolution (ms per frame). Is phase 5 needed for the acceptance games, or only for high upscaling?
 - **S4** Image formats and orientation per core (origin, sRGB, 10-bit).
 - **S5** Teardown: do the cores' `context_destroy`/`deinit` free cleanly with MoltenVK? Repeat each 12 times (the Play! check from `STANDALONE_PLAN.md`).
@@ -127,10 +127,10 @@ Add a minimal Vulkan context to `ursprung-smoke` only (readback, one sync index,
 
 #### Spike results (8 October 2026)
 
-The spike ran on the real bridge instead of a throwaway context: phases 1 and 2 were built first, and `ursprung-smoke` gained what the questions needed (`URSMOKE_RENDERER`, `URSMOKE_LIST_OPTIONS`, `URSMOKE_REPEAT`, `URSMOKE_SAVE_STATE`/`URSMOKE_LOAD_STATE`, the time per frame spent in the core, and `URSPRUNG_VULKAN_LOG=1` for the context's log). Apple M4, MoltenVK 1.4.2, buildbot cores of 8 October (PPSSPP of 29 September), the user's games. Besides the four cores of the plan, Beetle PSX HW, PPSSPP and Azahar were checked.
+The spike ran on the real bridge instead of a throwaway context: phases 1 and 2 were built first, and `atrium-smoke` gained what the questions needed (`URSMOKE_RENDERER`, `URSMOKE_LIST_OPTIONS`, `URSMOKE_REPEAT`, `URSMOKE_SAVE_STATE`/`URSMOKE_LOAD_STATE`, the time per frame spent in the core, and `ATRIUM_VULKAN_LOG=1` for the context's log). Apple M4, MoltenVK 1.4.2, buildbot cores of 8 October (PPSSPP of 29 September), the user's games. Besides the four cores of the plan, Beetle PSX HW, PPSSPP and Azahar were checked.
 
 - **S1** Negotiation: Dolphin uses v2 (`create_instance` with `VK_EXT_layer_settings`, through which it configures MoltenVK itself, then `create_device2`); Mupen64Plus-Next (Granite), Flycast, SwanStation, Beetle PSX HW, PPSSPP and Azahar use v1 `create_device`. MoltenVK grants everything they ask for: paraLLEl-RDP enables 18 device extensions (8/16-bit storage, float16/int8, subgroup size control, timeline semaphores, synchronization2, …), Dolphin `VK_EXT_memory_budget` and `VK_KHR_sampler_mirror_clamp_to_edge`, Azahar `VK_EXT_shader_stencil_export` and `VK_EXT_external_memory_host`. One finding the plan had not foreseen: **Dolphin presents nothing without a `VkSurfaceKHR`**. It emulates a swapchain on top of the surface it gets in `create_device2` (RetroArch always passes one), so `URVulkanContext` creates a surface of a `CAMetalLayer` that is never shown, with `VK_KHR_surface` and `VK_EXT_metal_surface` on the instance and `VK_KHR_swapchain` on core-made devices, as RetroArch does. The only MoltenVK warning: paraLLEl-RDP enables blending on an `R8G8B8A8_UINT` attachment, which Metal ignores; the picture is correct.
-- **S2** Speed (`ursprung-smoke`; uncapped frames per second and milliseconds per frame in the core, including the readback; Dolphin and PPSSPP boot in wall-clock time, so they ran paced and only the time in the core compares):
+- **S2** Speed (`atrium-smoke`; uncapped frames per second and milliseconds per frame in the core, including the readback; Dolphin and PPSSPP boot in wall-clock time, so they ran paced and only the time in the core compares):
 
   | Game | OpenGL / software | Vulkan |
   |---|---|---|
@@ -153,8 +153,8 @@ The spike ran on the real bridge instead of a throwaway context: phases 1 and 2 
 ### Phase 1 — Dependency (S)
 
 - `Scripts/fetch-moltenvk.sh`: downloads the pinned `MoltenVK-macos.tar` (v1.4.2, 56 MB) from GitHub releases, checks its SHA-256, extracts `libMoltenVK.dylib`, thins it to arm64 (`lipo -thin`, roughly halves the universal 11 MB), sets the install name to `@rpath/libMoltenVK.dylib`. Called from `make project`; CI caches it. Same pattern as `fetch-librashader.sh`.
-- `ThirdParty/moltenvk/`: README (version, update steps, licence, source link), `LICENSE`, the Vulkan headers from the release (or Vulkan-Headers at the matching tag) and `libretro_vulkan.h` in `Ursprung/Bridge/`.
-- `project.yml`: link and embed for Ursprung, `ursprung-smoke` and the tests; header search paths.
+- `ThirdParty/moltenvk/`: README (version, update steps, licence, source link), `LICENSE`, the Vulkan headers from the release (or Vulkan-Headers at the matching tag) and `libretro_vulkan.h` in `Atrium/Bridge/`.
+- `project.yml`: link and embed for Atrium, `atrium-smoke` and the tests; header search paths.
 - CLAUDE.md ("Hard rules": agreed dependencies; "Known issues": remove "Vulkan cores/renderers unsupported" when phase 4 lands), About/acknowledgements, `docs/ARCHITECTURE.md`.
 - Acceptance: `make build`, `make test`, CI and `make dist` (signature, notarization check) pass with the dylib embedded.
 - As built: `Scripts/fetch-moltenvk.sh` also copies the release's C headers (not the 20 MB of C++ bindings) to `ThirdParty/moltenvk/include`; `lib/` and `include/` are git-ignored, CI caches both. The release already has the `@rpath` install name. `make smoke` takes `RENDERER=vulkan`. The app links QuartzCore for the surface's layer. Dolphin also `dlopen`s `libvulkan.1.dylib` at boot to fill in its adapter and feature info (before it gets the frontend's context); without it, every launch showed “Warning - Failed to load Vulkan library.” although the game then ran on Vulkan. A build phase links `Contents/Frameworks/libvulkan.1.dylib` to `libMoltenVK.dylib` (and the fetch script does the same in `lib/` for the smoke tool); dyld finds a leaf name through the main executable's rpath and hands back the MoltenVK already loaded, not a second copy. `make dist` is not run yet: it needs the Developer ID certificate (see `docs/RELEASE.md`).
@@ -162,10 +162,10 @@ The spike ran on the real bridge instead of a throwaway context: phases 1 and 2 
 ### Phase 2 — Bridge (L)
 
 - `URVulkanContext` and the `URLibretroCore` changes described above, with readback.
-- `ursprung-smoke` gains `--renderer vulkan|opengl` (sets the preference and the option defaults), so every core can be checked headlessly.
-- `Tools/ursprung-test-core` gets a Vulkan mode: it requests Vulkan, clears its image to a frame-dependent colour each frame and supports serialize. `EmulationRunnerTests` check the colour reaches `_back`, sync indices advance, and load/unload repeats without leaks or crashes. Tests skip when no Vulkan device exists (CI runner without a GPU).
+- `atrium-smoke` gains `--renderer vulkan|opengl` (sets the preference and the option defaults), so every core can be checked headlessly.
+- `Tools/atrium-test-core` gets a Vulkan mode: it requests Vulkan, clears its image to a frame-dependent colour each frame and supports serialize. `EmulationRunnerTests` check the colour reaches `_back`, sync indices advance, and load/unload repeats without leaks or crashes. Tests skip when no Vulkan device exists (CI runner without a GPU).
 - Acceptance: Ocarina of Time with paraLLEl-RDP and the Dolphin intro render through `make smoke` and the app; quitting a game twelve times in a row crashes nothing.
-- As built: `URVulkanContext` (Objective-C) follows the design above with these differences: one command buffer, fence and readback buffer instead of one per sync index, because every frame is waited for (`wait_sync_index` returns at once unless a frame timed out; the core still sees two sync indices, `get_sync_index_mask` = `0b11`); cores' `vkGetInstanceProcAddr` routes `vkCreateDevice` through Ursprung, so cores that make the device themselves (v1) get `VK_KHR_portability_subset` and `VK_KHR_swapchain` too; the surface from S1. Every video refresh submits what the core handed over with it, within the call: a hidden frame (run-ahead, rewinding) waits for the image's semaphores without copying, a duplicate frame (`video_refresh(NULL)`) runs the command buffers and signals the core's semaphore but waits for nothing; work handed over without any refresh runs like a duplicate frame after `retro_run`. `SET_HW_RENDER` refuses Vulkan when MoltenVK offers no device (probed once), so the core falls back; if the context then fails after `retro_load_game`, loading fails with a message instead (without writing the battery save). `retro_reset` forgets the core's image first. Teardown: wait idle, `context_destroy`, `retro_unload_game`, `retro_deinit`, then `destroy_device`, device, surface, instance, as in RetroArch. The pixel formats are converted in `URPixelConversion.c` (plain C, unit-tested): BGRA8, RGBA8, A2B10G10R10, A2R10G10B10, RGBA16F, RGB565, A1R5G5B5, R5G5B5A1. Run-ahead stays off for hardware-rendered games, as with OpenGL. `ursprung-smoke` takes `URSMOKE_RENDERER=vulkan` instead of `--renderer`; option defaults are passed with `URSMOKE_OPTIONS` (they live in the Swift catalog). The test core's Vulkan modes (submitting itself with a semaphore, or handing over command buffers) use negotiation v2 with `create_device2`; the tests (`EmulationRunnerTests` › "Vulkan rendering") check pixels, both sync indices, hidden frames, states, run-ahead and 13 load/unload rounds with `destroy_device` counted, and skip without a Vulkan device.
+- As built: `URVulkanContext` (Objective-C) follows the design above with these differences: one command buffer, fence and readback buffer instead of one per sync index, because every frame is waited for (`wait_sync_index` returns at once unless a frame timed out; the core still sees two sync indices, `get_sync_index_mask` = `0b11`); cores' `vkGetInstanceProcAddr` routes `vkCreateDevice` through Atrium, so cores that make the device themselves (v1) get `VK_KHR_portability_subset` and `VK_KHR_swapchain` too; the surface from S1. Every video refresh submits what the core handed over with it, within the call: a hidden frame (run-ahead, rewinding) waits for the image's semaphores without copying, a duplicate frame (`video_refresh(NULL)`) runs the command buffers and signals the core's semaphore but waits for nothing; work handed over without any refresh runs like a duplicate frame after `retro_run`. `SET_HW_RENDER` refuses Vulkan when MoltenVK offers no device (probed once), so the core falls back; if the context then fails after `retro_load_game`, loading fails with a message instead (without writing the battery save). `retro_reset` forgets the core's image first. Teardown: wait idle, `context_destroy`, `retro_unload_game`, `retro_deinit`, then `destroy_device`, device, surface, instance, as in RetroArch. The pixel formats are converted in `URPixelConversion.c` (plain C, unit-tested): BGRA8, RGBA8, A2B10G10R10, A2R10G10B10, RGBA16F, RGB565, A1R5G5B5, R5G5B5A1. Run-ahead stays off for hardware-rendered games, as with OpenGL. `atrium-smoke` takes `URSMOKE_RENDERER=vulkan` instead of `--renderer`; option defaults are passed with `URSMOKE_OPTIONS` (they live in the Swift catalog). The test core's Vulkan modes (submitting itself with a semaphore, or handing over command buffers) use negotiation v2 with `create_device2`; the tests (`EmulationRunnerTests` › "Vulkan rendering") check pixels, both sync indices, hidden frames, states, run-ahead and 13 load/unload rounds with `destroy_device` counted, and skip without a Vulkan device.
 - Review fixes (9 October 2026, `docs/VULKAN_REVIEW_2026-10-09.md`): a frame the GPU does not finish within 10 s, a lost device or a failed submit marks the context failed for good; `shutdownRequested` then ends the game and `runFrame` calls no `retro_run`, and teardown leaves the device alone if the timed-out frame never finishes. Re-review fix (R1, `docs/VULKAN_REREVIEW_2026-10-09.md`): a frame that timed out keeps the context `busy` until its fence signals or the device is lost; `wait_sync_index` blocks until then, and `unloadGame` calls no `context_destroy`, `retro_unload_game` or `retro_deinit` while it is busy: the core (object, library, Vulkan context, global callbacks) is kept and torn down by the next game's load once the frame is done, which refuses to load until then. A failed core also takes no reset, states, cheats or disc changes. With `set_command_buffers` the image's semaphores are ignored, as `libretro_vulkan.h` and RetroArch do. The signal semaphore is submitted in the refresh it belongs to, duplicate frames included. Queue-family ownership moves in the image's own layout on both sides (as in RetroArch), the readback's layout changes are separate barriers, and hidden frames still do the transfer. The image view's `VkComponentMapping` applies to the readback (`URComponentMapping`). New test-core switches cover these (`ignoredSemaphore`, `signalsFrames`, `swizzledView`, a simulated fence timeout or device loss); the two-queue-family case needs hardware MoltenVK does not offer (one queue family). `make smoke RENDERER=vulkan` fails when the game renders with another API (`ALLOW_FALLBACK=1` accepts it) and takes `OPTIONS=`.
 
 ### Phase 3 — Model and settings (M)
@@ -189,7 +189,7 @@ The spike ran on the real bridge instead of a throwaway context: phases 1 and 2 
   - Ocarina of Time: full speed with paraLLEl-RDP at 1× and 2×; save and load a state; screenshot; a librashader preset; resume after quit.
   - MGS: The Twin Snakes: no `ARB_buffer_storage` warning; full speed from the intro into the first playable scene; save and load a state; disc 2 swap via the `.m3u`.
 - As built: Mupen64Plus-Next defaults to Vulkan with paraLLEl-RDP and paraLLEl-RSP; **ParaLLEl N64 has no paraLLEl-RDP in its macOS build** (its `gfxplugin` option offers gliden64, glide64, gln64, rice, angrylion), so it keeps angrylion and has no Vulkan choice. Dolphin, Flycast, SwanStation (faster in S2 at 1× and 4×) and Beetle PSX HW (new, third PlayStation core after Beetle PSX, needs a BIOS like it) default to Vulkan. Flycast is 0.4 ms per frame slower at native resolution but faster upscaled and the only renderer with per-pixel alpha sorting on the Mac, so it defaults to Vulkan too. PPSSPP can choose Vulkan but stays on OpenGL (no gain). Dolphin keeps `experimental` until the manual checks below are done.
-- Checked in the app (Debug build, 8 October 2026, `URSPRUNG_AUTOPLAY`, the user's library restored afterwards): Ocarina of Time 60 fps with Vulkan (paraLLEl-RDP 1×), state saved and loaded (manifest `"renderer": "vulkan"`), screenshot, resume after quit, the crt-geom preset at 6 ms GPU time; MGS: The Twin Snakes 59.9 fps into the intro cutscene with no warning, state saved and loaded. Checked by the user with a controller (9 October 2026): MGS: The Twin Snakes plays and the disc 2 swap works. That run brought up Dolphin's “Failed to load Vulkan library” toast on every launch (fixed with the `libvulkan.1.dylib` link, see phase 1). Its one crash was not Ursprung's: the game ran in the window of a test host (`xcodebuild test`), and XCTest's `exit()` at the end of the tests hit Dolphin's running threads. Not checked yet: paraLLEl-RDP 2× in the app; after that Dolphin can drop `experimental`.
+- Checked in the app (Debug build, 8 October 2026, `ATRIUM_AUTOPLAY`, the user's library restored afterwards): Ocarina of Time 60 fps with Vulkan (paraLLEl-RDP 1×), state saved and loaded (manifest `"renderer": "vulkan"`), screenshot, resume after quit, the crt-geom preset at 6 ms GPU time; MGS: The Twin Snakes 59.9 fps into the intro cutscene with no warning, state saved and loaded. Checked by the user with a controller (9 October 2026): MGS: The Twin Snakes plays and the disc 2 swap works. That run brought up Dolphin's “Failed to load Vulkan library” toast on every launch (fixed with the `libvulkan.1.dylib` link, see phase 1). Its one crash was not Atrium's: the game ran in the window of a test host (`xcodebuild test`), and XCTest's `exit()` at the end of the tests hit Dolphin's running threads. Not checked yet: paraLLEl-RDP 2× in the app; after that Dolphin can drop `experimental`.
 
 ### Phase 5 — Zero-copy presentation (M)
 
@@ -206,7 +206,7 @@ Status (8 October 2026): not needed for now. At native and 2× the readback cost
 
 - Spike with Azahar (`azahar_libretro`, Software/Vulkan only on macOS): boots a game, speed, two screens layout options, touch input, save states. If it fails, stop here.
 - If it works: `3ds` system in `SystemCatalog` (ScreenScraper 17, `.3ds`/`.cci`/`.cxi`/`.3dsx`, aliases `3ds`, `n3ds`, `nintendo3ds`), screen layout and stylus mapping like melonDS DS, BIOS/keys notes in `docs/BIOS.md`.
-- Spike (8 October 2026): blocked on test content. `azahar_libretro` (2126.1.2, 31 MB) is on the buildbot for macOS arm64 and works with Ursprung's Vulkan context (negotiation v1, both screens stacked in one 400×480 `R8G8B8A8` frame, 3.5 MB states, twelve load/unload rounds). The only game at hand, the open-source homebrew Super Haxagon 3.9.1 (`.3dsx`), stops after its first second with a kernel error with both the Vulkan and the software renderer, so it says nothing about Azahar's rendering. The phase needs a decrypted dump of a real game (the user has none) before the system is added.
+- Spike (8 October 2026): blocked on test content. `azahar_libretro` (2126.1.2, 31 MB) is on the buildbot for macOS arm64 and works with Atrium's Vulkan context (negotiation v1, both screens stacked in one 400×480 `R8G8B8A8` frame, 3.5 MB states, twelve load/unload rounds). The only game at hand, the open-source homebrew Super Haxagon 3.9.1 (`.3dsx`), stops after its first second with a kernel error with both the Vulkan and the software renderer, so it says nothing about Azahar's rendering. The phase needs a decrypted dump of a real game (the user has none) before the system is added.
 
 ## Tests
 
@@ -240,7 +240,7 @@ The user followed the recommendations. Where the plan had none, the choice below
 3. **Q3 Defaults for Flycast, SwanStation, PPSSPP: decided by spike S2.**
    - A core defaults to Vulkan only if it is at least as fast and as correct as on OpenGL and passes the teardown check (S5).
 4. **Q4 MoltenVK: embedded in the app.**
-   - Signed and notarized with Ursprung, no first-run download, works offline. About 5–6 MB after thinning to arm64.
+   - Signed and notarized with Atrium, no first-run download, works offline. About 5–6 MB after thinning to arm64.
 5. **Q5 3DS: in this plan as phase 6, behind its own spike.**
    - Azahar on macOS has no OpenGL renderer, so 3DS exists only through this work. If the spike fails, the phase stops without affecting phases 1–5.
 6. **Q6 Order: `STANDALONE_PLAN.md` first, then this plan.**

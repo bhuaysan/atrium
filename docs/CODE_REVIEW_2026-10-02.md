@@ -1,4 +1,4 @@
-# Umfangreicher Code-Review – Ursprung
+# Umfangreicher Code-Review – Atrium
 
 **Datum:** 02.10.2026 · **Basis:** `b5a9e1d7ca9d2ed5e515550189637f580dab3093` (`main`) · **Art:** erneute Prüfung des aktuellen Gesamtstands.
 
@@ -34,7 +34,7 @@ Die vorhandene Testsuite besteht: **110 Tests / 136 Testfälle einschließlich P
 
 ### 1. [P1] Überlappende Bibliotheksordner überschreiben bestehende Spieldaten
 
-**Fundstellen:** [LibraryStore.swift:116](<../Ursprung/Library/LibraryStore.swift:116>), insbesondere Zeilen 118–128; [LibraryScanner.swift:31](<../Ursprung/Library/LibraryScanner.swift:31>).
+**Fundstellen:** [LibraryStore.swift:116](<../Atrium/Library/LibraryStore.swift:116>), insbesondere Zeilen 118–128; [LibraryScanner.swift:31](<../Atrium/Library/LibraryScanner.swift:31>).
 
 **Auslöser:** Sowohl einen übergeordneten Ordner als auch einen enthaltenen Systemordner registrieren, beispielsweise `/ROMs` und `/ROMs/SNES`, und erneut scannen. `addFolder` verhindert nur identische Einträge. Der Scanner hängt die Ergebnisse aller Ordner zusammen und liefert das gleiche ROM mehrfach.
 
@@ -48,7 +48,7 @@ Die vorhandene Testsuite besteht: **110 Tests / 136 Testfälle einschließlich P
 
 ### 2. [P1] Ein unlesbarer Unterordner löscht Bibliothekseinträge und Medien
 
-**Fundstellen:** [LibraryScanner.swift:42](<../Ursprung/Library/LibraryScanner.swift:42>), Zeilen 42–48; [LibraryStore.swift:102](<../Ursprung/Library/LibraryStore.swift:102>) und [LibraryStore.swift:137](<../Ursprung/Library/LibraryStore.swift:137>).
+**Fundstellen:** [LibraryScanner.swift:42](<../Atrium/Library/LibraryScanner.swift:42>), Zeilen 42–48; [LibraryStore.swift:102](<../Atrium/Library/LibraryStore.swift:102>) und [LibraryStore.swift:137](<../Atrium/Library/LibraryStore.swift:137>).
 
 **Auslöser:** Ein bereits eingelesener Unterordner wird unlesbar, während sein registrierter Elternordner weiterhin existiert. Denkbar sind geänderte Rechte oder Zugriffsfehler während eines Scans. Praktisch geprüft wurde ein entzogener Lese-/Suchzugriff mittels Dateirechten.
 
@@ -62,7 +62,7 @@ Die vorhandene Testsuite besteht: **110 Tests / 136 Testfälle einschließlich P
 
 ### 3. [P1] Der Selbstimport eines BIOS löscht die installierte Datei
 
-**Fundstelle:** [BIOSManager.swift:93](<../Ursprung/Cores/BIOSManager.swift:93>), insbesondere Zeilen 95–100.
+**Fundstelle:** [BIOSManager.swift:93](<../Atrium/Cores/BIOSManager.swift:93>), insbesondere Zeilen 95–100.
 
 **Auslöser:** Über „Open System Folder“ eine bereits installierte BIOS-Datei auswählen und diese erneut importieren; alternativ den Systemordner selbst in die Importfläche ziehen.
 
@@ -76,7 +76,7 @@ Die vorhandene Testsuite besteht: **110 Tests / 136 Testfälle einschließlich P
 
 ### 4. [P1] Core-Optionswerte können nach ihrer Ausgabe an den Core freigegeben werden
 
-**Fundstellen:** [URLibretroCore.m:564](<../Ursprung/Bridge/URLibretroCore.m:564>), insbesondere Zeile 575; [URLibretroCore.m:536](<../Ursprung/Bridge/URLibretroCore.m:536>); [EmulationSession.swift:486](<../Ursprung/Emulation/EmulationSession.swift:486>), Zeilen 486–498.
+**Fundstellen:** [URLibretroCore.m:564](<../Atrium/Bridge/URLibretroCore.m:564>), insbesondere Zeile 575; [URLibretroCore.m:536](<../Atrium/Bridge/URLibretroCore.m:536>); [EmulationSession.swift:486](<../Atrium/Emulation/EmulationSession.swift:486>), Zeilen 486–498.
 
 **Auslöser:** Der Core erhält über `GET_VARIABLE` den C-Zeiger eines Optionswerts. Bevor er diesen Wert fertig gelesen hat, wird derselbe Wert von der UI ersetzt oder zurückgesetzt.
 
@@ -90,7 +90,7 @@ Die vorhandene Testsuite besteht: **110 Tests / 136 Testfälle einschließlich P
 
 ### 5. [P2] Audio-Reset und Audio-Leser schreiben gleichzeitig den Leseindex
 
-**Fundstellen:** [URAudioRing.c:21](<../Ursprung/Bridge/URAudioRing.c:21>) und [URAudioRing.c:47](<../Ursprung/Bridge/URAudioRing.c:47>), insbesondere Zeile 63; Aufruf bei [UREmulationRunner.m:173](<../Ursprung/Bridge/UREmulationRunner.m:173>).
+**Fundstellen:** [URAudioRing.c:21](<../Atrium/Bridge/URAudioRing.c:21>) und [URAudioRing.c:47](<../Atrium/Bridge/URAudioRing.c:47>), insbesondere Zeile 63; Aufruf bei [UREmulationRunner.m:173](<../Atrium/Bridge/UREmulationRunner.m:173>).
 
 **Auslöser:** Fast Forward oder die Überfüllungskorrektur leert den Ring auf dem Emulationsthread, während der Audiothread gerade Samples liest.
 
@@ -111,7 +111,7 @@ Ohne einen weiteren Schreibvorgang erscheinen vier Millionen zuvor verworfene Fr
 
 ### 6. [P2] Nach Abbruch können neu eingereihte Metadaten-Aufträge ohne Worker bleiben
 
-**Fundstellen:** [MetadataService.swift:24](<../Ursprung/Metadata/MetadataService.swift:24>), Zeilen 24–44; [MetadataService.swift:70](<../Ursprung/Metadata/MetadataService.swift:70>), Zeilen 70–75.
+**Fundstellen:** [MetadataService.swift:24](<../Atrium/Metadata/MetadataService.swift:24>), Zeilen 24–44; [MetadataService.swift:70](<../Atrium/Metadata/MetadataService.swift:70>), Zeilen 70–75.
 
 **Auslöser:** Metadatenabruf stoppen und einen neuen Abruf anfordern, bevor der abgebrochene Worker vollständig ausgelaufen ist. Das kann auch durch einen Scan mit neuen Spielen passieren.
 
@@ -125,7 +125,7 @@ Ohne einen weiteren Schreibvorgang erscheinen vier Millionen zuvor verworfene Fr
 
 ### 7. [P2] ROM-Austausch bei gleicher Größe lässt die gespeicherte CRC32 unverändert
 
-**Fundstellen:** [LibraryStore.swift:120](<../Ursprung/Library/LibraryStore.swift:120>), Zeilen 120–123; Verwendung bei [MetadataService.swift:81](<../Ursprung/Metadata/MetadataService.swift:81>), Zeilen 81–89.
+**Fundstellen:** [LibraryStore.swift:120](<../Atrium/Library/LibraryStore.swift:120>), Zeilen 120–123; Verwendung bei [MetadataService.swift:81](<../Atrium/Metadata/MetadataService.swift:81>), Zeilen 81–89.
 
 **Auslöser:** Ein ROM am bestehenden Pfad durch eine andere Version oder einen Patch gleicher Größe ersetzen und neu scannen. Der gleiche Fehler betrifft ZIPs, deren äußere Größe unverändert bleibt, obwohl der Scanner einen anderen CRC-Wert des Eintrags erkennt.
 
@@ -139,7 +139,7 @@ Ohne einen weiteren Schreibvorgang erscheinen vier Millionen zuvor verworfene Fr
 
 ### 8. [P2] Bildcache zeigt nach einem Austausch weiterhin alte Cover und Save-State-Thumbnails
 
-**Fundstellen:** [Artwork.swift:20](<../Ursprung/UI/Components/Artwork.swift:20>) und [Artwork.swift:43](<../Ursprung/UI/Components/Artwork.swift:43>); [Artwork.swift:77](<../Ursprung/UI/Components/Artwork.swift:77>); Schreibpfad bei [MetadataService.swift:105](<../Ursprung/Metadata/MetadataService.swift:105>). Save-State-Anzeige: [PauseMenuView.swift:502](<../Ursprung/UI/Player/PauseMenuView.swift:502>).
+**Fundstellen:** [Artwork.swift:20](<../Atrium/UI/Components/Artwork.swift:20>) und [Artwork.swift:43](<../Atrium/UI/Components/Artwork.swift:43>); [Artwork.swift:77](<../Atrium/UI/Components/Artwork.swift:77>); Schreibpfad bei [MetadataService.swift:105](<../Atrium/Metadata/MetadataService.swift:105>). Save-State-Anzeige: [PauseMenuView.swift:502](<../Atrium/UI/Player/PauseMenuView.swift:502>).
 
 **Auslöser:** Bereits angezeigte Metadatenbilder erneut herunterladen oder einen bereits angezeigten Save-State-Slot überschreiben.
 
@@ -153,7 +153,7 @@ Ohne einen weiteren Schreibvorgang erscheinen vier Millionen zuvor verworfene Fr
 
 ### 9. [P2] ZIP-Nutzdaten werden ohne CRC-Prüfung als erfolgreich extrahiert behandelt
 
-**Fundstelle:** [ZipArchive.swift:70](<../Ursprung/Support/ZipArchive.swift:70>), Zeilen 70–83; Cache-Markierung bei [ZipArchive.swift:100](<../Ursprung/Support/ZipArchive.swift:100>).
+**Fundstelle:** [ZipArchive.swift:70](<../Atrium/Support/ZipArchive.swift:70>), Zeilen 70–83; Cache-Markierung bei [ZipArchive.swift:100](<../Atrium/Support/ZipArchive.swift:100>).
 
 **Auslöser:** Ein Archiv enthält beschädigte Nutzdaten bei weiterhin plausiblen Offsets und Größen. Beim unkomprimierten ZIP-Verfahren genügt ein einzelnes verändertes Nutzdatenbyte.
 
@@ -167,7 +167,7 @@ Ohne einen weiteren Schreibvorgang erscheinen vier Millionen zuvor verworfene Fr
 
 ### 10. [P2] Intellivision gilt bereits mit nur einer seiner zwei Pflichtdateien als startbereit
 
-**Fundstelle:** [BIOSManager.swift:34](<../Ursprung/Cores/BIOSManager.swift:34>), insbesondere Zeile 37; Katalog: [SystemCatalog.swift:259](<../Ursprung/Systems/SystemCatalog.swift:259>).
+**Fundstelle:** [BIOSManager.swift:34](<../Atrium/Cores/BIOSManager.swift:34>), insbesondere Zeile 37; Katalog: [SystemCatalog.swift:259](<../Atrium/Systems/SystemCatalog.swift:259>).
 
 **Auslöser:** Nur `exec.bin` ist vorhanden, `grom.bin` fehlt – oder umgekehrt.
 
@@ -181,7 +181,7 @@ Ohne einen weiteren Schreibvorgang erscheinen vier Millionen zuvor verworfene Fr
 
 ### 11. [P2] Playlists mit Discs in Unterordnern erzeugen zusätzliche Spieleinträge
 
-**Fundstellen:** [LibraryScanner.swift:52](<../Ursprung/Library/LibraryScanner.swift:52>), Zeilen 52–60; [LibraryScanner.swift:134](<../Ursprung/Library/LibraryScanner.swift:134>), Zeilen 134–135.
+**Fundstellen:** [LibraryScanner.swift:52](<../Atrium/Library/LibraryScanner.swift:52>), Zeilen 52–60; [LibraryScanner.swift:134](<../Atrium/Library/LibraryScanner.swift:134>), Zeilen 134–135.
 
 **Auslöser:** Ein Mehrdisc-Spiel verwendet zum Beispiel folgende Struktur:
 
@@ -203,9 +203,9 @@ PSX/
 
 ### 12. [P2] Fast Forward bleibt aktiv, wenn das Loslassen der Leertaste nicht beim Player ankommt
 
-**Fundstellen:** [GameMetalView.swift:58](<../Ursprung/UI/Player/GameMetalView.swift:58>), Zeilen 58–72; [EmulationSession.swift:337](<../Ursprung/Emulation/EmulationSession.swift:337>), Zeilen 337–346.
+**Fundstellen:** [GameMetalView.swift:58](<../Atrium/UI/Player/GameMetalView.swift:58>), Zeilen 58–72; [EmulationSession.swift:337](<../Atrium/Emulation/EmulationSession.swift:337>), Zeilen 337–346.
 
-**Auslöser:** Leertaste für Fast Forward halten, zu einer anderen App wechseln, dort loslassen und zu Ursprung zurückkehren. Auch ein Wechsel des Tastaturfokus zum Pausemenü kann das entsprechende `keyUp` vom Player fernhalten.
+**Auslöser:** Leertaste für Fast Forward halten, zu einer anderen App wechseln, dort loslassen und zu Atrium zurückkehren. Auch ein Wechsel des Tastaturfokus zum Pausemenü kann das entsprechende `keyUp` vom Player fernhalten.
 
 **Ursache und Auswirkung:** Fast Forward wird über `keyDown` eingeschaltet und ausschließlich über das passende `keyUp` bzw. vollständiges Session-Cleanup ausgeschaltet. Die Behandlung der App-Deaktivierung setzt nur den Pausezustand und die normalen Tastatureingaben zurück. `isFastForwarding` bleibt gesetzt; nach dem Fortsetzen läuft das Spiel weiter mit erhöhter Geschwindigkeit, bis die Leertaste erneut gedrückt und losgelassen wird.
 
@@ -243,7 +243,7 @@ Die temporären Swift-Tests formulieren das gewünschte korrekte Verhalten. Ihre
 
 Der erste reguläre Xcode-Testversuch scheiterte an Sandbox-Beschränkungen der Testdienste. Der anschließende freigegebene Testlauf außerhalb der Sandbox war erfolgreich. Ein späterer Testfilter ohne vollständige Swift-Testing-Funktionsnamen selektierte null Tests; dieser Lauf wurde nicht als Verifikation gewertet. Die drei betreffenden Tests wurden danach mit ihren korrekten Namen ausgeführt und die Ergebnisse aus den XCResult-Berichten ausgelesen.
 
-Die temporären Arbeits- und Belegdateien liegen unter `/tmp/ursprung-review-20261002-unags_xe/`. Sie sind nicht Bestandteil des Repositorys und können vom System später entfernt werden. Dieser Bericht enthält deshalb die für die Bewertung erforderlichen Reproduktionsschritte und Resultate selbst.
+Die temporären Arbeits- und Belegdateien liegen unter `/tmp/atrium-review-20261002-unags_xe/`. Sie sind nicht Bestandteil des Repositorys und können vom System später entfernt werden. Dieser Bericht enthält deshalb die für die Bewertung erforderlichen Reproduktionsschritte und Resultate selbst.
 
 ### Abgleich mit dem älteren Review
 

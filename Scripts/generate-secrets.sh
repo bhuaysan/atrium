@@ -11,7 +11,7 @@
 set -eu
 
 ENV_FILE="${1:-.env}"
-OUTPUT="${2:-Ursprung/Support/Secrets.generated.swift}"
+OUTPUT="${2:-Atrium/Support/Secrets.generated.swift}"
 
 DEV_ID=""
 DEV_PASSWORD=""

@@ -1,6 +1,6 @@
 # BIOS files
 
-Some systems need the original firmware ("BIOS") of the console. Ursprung never
+Some systems need the original firmware ("BIOS") of the console. Atrium never
 ships BIOS files — you have to dump them from hardware you own.
 
 ## Importing
@@ -8,9 +8,9 @@ ships BIOS files — you have to dump them from hardware you own.
 1. Open **Settings → BIOS**.
 2. Click **Import BIOS Files…** or drag files (or a whole folder) onto the
    window.
-3. Ursprung recognises each file by its MD5 checksum or file name, renames it to
+3. Atrium recognises each file by its MD5 checksum or file name, renames it to
    what the core expects and copies it to
-   `~/Library/Application Support/Ursprung/System/`.
+   `~/Library/Application Support/Atrium/System/`.
 
 The list shows a status for every file:
 
@@ -64,12 +64,12 @@ core) has a built-in HLE BIOS.
 ### PlayStation 2
 
 PS2 BIOS dumps come in dozens of versions with arbitrary file names, so they
-are not matched by name or checksum. Ursprung accepts any file whose content
+are not matched by name or checksum. Atrium accepts any file whose content
 is a PS2 BIOS (a 4 MB image with `RESET`, `ROMVER` and `OSDSYS` in its ROM
 directory) and copies it, with side files of the same name (`.EROM`, `.ROM1`,
 `.ROM2`, `.NVM`, `.MEC`), to `System/pcsx2/bios/`. Settings → BIOS lists each
 dump with its region and version. At least one dump is required. For every
-game Ursprung picks the newest dump of the disc's region (from the disc
+game Atrium picks the newest dump of the disc's region (from the disc
 serial, else the file name, else the metadata region), and any dump when
 there is none of that region.
 

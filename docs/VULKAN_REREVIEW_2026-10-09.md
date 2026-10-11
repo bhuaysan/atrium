@@ -22,13 +22,13 @@ Geprüft wurden die Fixes für F1–F5, die zusätzlichen Regressionstests, Spei
 
 ## R1 · P1 – Ein anhaltender Timeout erlaubt weiterhin Zugriff und Freigabe laufender Core-Ressourcen
 
-**Stellen:** [URLibretroCore.m:452](../Ursprung/Bridge/URLibretroCore.m#L452), [URVulkanContext.m:815](../Ursprung/Bridge/URVulkanContext.m#L815), [wait_sync_index:959](../Ursprung/Bridge/URVulkanContext.m#L959).
+**Stellen:** [URLibretroCore.m:452](../Atrium/Bridge/URLibretroCore.m#L452), [URVulkanContext.m:815](../Atrium/Bridge/URVulkanContext.m#L815), [wait_sync_index:959](../Atrium/Bridge/URVulkanContext.m#L959).
 
 ### Der Core-Abbau ignoriert den gescheiterten Abschluss
 
 `settleUnfinishedFrame` setzt nach einem zweiten Timeout `_abandoned = YES` und liefert `NO`. `waitIdle` kehrt daraufhin zurück, ohne nachgewiesen zu haben, dass die GPU fertig ist. Da `waitIdle` keinen Status zurückgibt, fährt `unloadGame` unmittelbar mit `context_destroy`, `retro_unload_game` und `retro_deinit` fort.
 
-Diese Core-Callbacks können genau die Images, Semaphoren, Speicherbereiche und Command Pools freigeben, welche die noch laufende Submission verwendet. Dass `URVulkanContext.destroy` später das eigene Device und die Instanz absichtlich bestehen lässt, schützt die vorher freigegebenen Core-Ressourcen nicht. Wartet ein Core in seinem Destructor selbst mit `vkDeviceWaitIdle`, kann stattdessen der gesamte Shutdown hängen bleiben. Der mitgelieferte Test-Core tut das in [TestDestroyResources:188](../Tools/ursprung-test-core/test_core.c#L188).
+Diese Core-Callbacks können genau die Images, Semaphoren, Speicherbereiche und Command Pools freigeben, welche die noch laufende Submission verwendet. Dass `URVulkanContext.destroy` später das eigene Device und die Instanz absichtlich bestehen lässt, schützt die vorher freigegebenen Core-Ressourcen nicht. Wartet ein Core in seinem Destructor selbst mit `vkDeviceWaitIdle`, kann stattdessen der gesamte Shutdown hängen bleiben. Der mitgelieferte Test-Core tut das in [TestDestroyResources:188](../Tools/atrium-test-core/test_core.c#L188).
 
 **Reproduziert:** Frame-Wait und nachfolgender Teardown-Wait wurden im Originalcode beide mit `VK_TIMEOUT` beantwortet. Trotzdem liefen sämtliche drei Core-Abbau-Callbacks:
 
@@ -40,7 +40,7 @@ F1 after persistent timeout: context_destroy=1 unload=1 deinit=1 abandoned=1
 
 ### Auch der bereits laufende Core-Aufruf ist noch nicht abgesichert
 
-Die neue Schranke in `runFrame` verhindert erst den nächsten Aufruf. Der aktuelle `retro_run` läuft nach der Rückkehr aus dem fehlgeschlagenen Video-Callback weiter. Ruft der Core dort `wait_sync_index` auf, kehrt dieser weiterhin sofort zurück. Damit erhält er die vertragliche Freigabe zur Wiederverwendung seiner Frame-Ressourcen, obwohl `_fenceUnfinished` gesetzt ist. Der [libretro-Vertrag:476](../Ursprung/Bridge/libretro_vulkan.h#L476) verlangt an dieser Stelle den Abschluss der GPU-Arbeit für den aktuellen Index.
+Die neue Schranke in `runFrame` verhindert erst den nächsten Aufruf. Der aktuelle `retro_run` läuft nach der Rückkehr aus dem fehlgeschlagenen Video-Callback weiter. Ruft der Core dort `wait_sync_index` auf, kehrt dieser weiterhin sofort zurück. Damit erhält er die vertragliche Freigabe zur Wiederverwendung seiner Frame-Ressourcen, obwohl `_fenceUnfinished` gesetzt ist. Der [libretro-Vertrag:476](../Atrium/Bridge/libretro_vulkan.h#L476) verlangt an dieser Stelle den Abschluss der GPU-Arbeit für den aktuellen Index.
 
 **Reproduziert:** Eine temporäre Core-Run-Funktion ruft nach dem Video-Callback `wait_sync_index` auf. Die Kontrolle kehrt mit `failed=1 unfinished=1` zum Core zurück. Ein anschließend angeforderter zweiter `retro_run` unterbleibt dagegen korrekt.
 
@@ -79,16 +79,16 @@ Die Reproduktion instrumentiert Rückgabewerte und Callback-Aufrufe. Sie provozi
 Die vollständige aktualisierte Testsuite wurde erneut ausgeführt:
 
 ```sh
-xcodebuild -project Ursprung.xcodeproj \
+xcodebuild -project Atrium.xcodeproj \
   -derivedDataPath build/DerivedData \
   -destination 'platform=macOS,arch=arm64' \
-  -scheme Ursprung test -quiet \
+  -scheme Atrium test -quiet \
   CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
 ```
 
 **Ergebnis:** 423 Testfälle insgesamt, davon **421 bestanden, 2 übersprungen, 0 fehlgeschlagen**. Mit Parameterfällen ergeben sich **464 erfolgreiche Ausführungen**. Alle zehn Vulkan-Testfälle einschließlich ihrer Parameterfälle liefen erfolgreich. Übersprungen wurden nur `everyPackPresetRoundTrips()` und `realPackUnpacksAndIndexes()` aus dem Shader-Bereich.
 
-Zusätzlich wurde unter `/tmp/ursprung-vulkan-rereview/` ein temporäres Prüfprogramm gegen die aktuellen Original-Implementierungen gebaut. Es bestätigt die Submit-/Callback-/Barrier-Korrekturen für F2–F4 und reproduziert R1 mit abgefangenen Vulkan-Submissions und simuliert anhaltenden Timeouts. Anwendungscode und Repository-Tests wurden dabei nicht verändert.
+Zusätzlich wurde unter `/tmp/atrium-vulkan-rereview/` ein temporäres Prüfprogramm gegen die aktuellen Original-Implementierungen gebaut. Es bestätigt die Submit-/Callback-/Barrier-Korrekturen für F2–F4 und reproduziert R1 mit abgefangenen Vulkan-Submissions und simuliert anhaltenden Timeouts. Anwendungscode und Repository-Tests wurden dabei nicht verändert.
 
 Die im Plan nachgetragenen manuellen MGS-/Disc-Wechsel-Prüfungen wurden in diesem Re-Review nicht wiederholt. Vulkan bei 2× N64-Auflösung in der App, Langzeitverhalten und notarisierten Distributionsbuild habe ich ebenfalls nicht erneut geprüft. Der verbleibende Fallback-Neustart aus V1 bleibt eine dokumentierte Produktentscheidung.
 
@@ -96,7 +96,7 @@ Die im Plan nachgetragenen manuellen MGS-/Disc-Wechsel-Prüfungen wurden in dies
 
 | ID | Status | Umsetzung | Test |
 |---|---|---|---|
-| R1 | behoben | „Fehlgeschlagen“ und „ausstehend“ sind getrennt: Nach einem Timeout bleibt der Kontext `busy`, bis die Fence signalisiert oder das Device verloren ist (andere Fehler gelten nicht als Abschluss). `wait_sync_index` blockiert bis dahin und kehrt nie mit ausstehender Arbeit zurück. `waitIdle` meldet das Ergebnis; ist der Frame beim Entladen noch nicht fertig, ruft `unloadGame` weder `context_destroy` noch `retro_unload_game` oder `retro_deinit` auf. Strategie für einen dauerhaft blockierten Core: Quarantäne im Prozess. Core-Objekt, `dlopen`-Handle, Vulkan-Kontext samt Interface und `gActiveCore` bleiben gültig (`gUnfinishedCore`). Der nächste Spielstart prüft ohne Warten, ob der Frame fertig ist: dann wird der alte Core genau einmal abgebaut, sonst verweigert der Start mit Fehler 7 und dem Hinweis, Ursprung neu zu öffnen. Nach einem Fehler nimmt der Core außerdem kein Reset, keine States (auch kein Autosave), keine Cheats und keinen Discwechsel mehr an. | `waitingForTheSyncIndexWaitsForAnUnfinishedFrame` (Timeout, `wait_sync_index` im selben `retro_run`), `anUnfinishedFrameDefersTheTeardown` (zwei Timeouts samt Abbau: keine Abbau-Callbacks, Core-Objekt bleibt; weiterer Timeout blockiert den nächsten Start; danach Abbau genau einmal vor dem neuen Spiel), `aFailedFrameStopsTheGame` (Timeout mit späterem Abschluss: Abbau genau einmal, keine States) |
+| R1 | behoben | „Fehlgeschlagen“ und „ausstehend“ sind getrennt: Nach einem Timeout bleibt der Kontext `busy`, bis die Fence signalisiert oder das Device verloren ist (andere Fehler gelten nicht als Abschluss). `wait_sync_index` blockiert bis dahin und kehrt nie mit ausstehender Arbeit zurück. `waitIdle` meldet das Ergebnis; ist der Frame beim Entladen noch nicht fertig, ruft `unloadGame` weder `context_destroy` noch `retro_unload_game` oder `retro_deinit` auf. Strategie für einen dauerhaft blockierten Core: Quarantäne im Prozess. Core-Objekt, `dlopen`-Handle, Vulkan-Kontext samt Interface und `gActiveCore` bleiben gültig (`gUnfinishedCore`). Der nächste Spielstart prüft ohne Warten, ob der Frame fertig ist: dann wird der alte Core genau einmal abgebaut, sonst verweigert der Start mit Fehler 7 und dem Hinweis, Atrium neu zu öffnen. Nach einem Fehler nimmt der Core außerdem kein Reset, keine States (auch kein Autosave), keine Cheats und keinen Discwechsel mehr an. | `waitingForTheSyncIndexWaitsForAnUnfinishedFrame` (Timeout, `wait_sync_index` im selben `retro_run`), `anUnfinishedFrameDefersTheTeardown` (zwei Timeouts samt Abbau: keine Abbau-Callbacks, Core-Objekt bleibt; weiterer Timeout blockiert den nächsten Start; danach Abbau genau einmal vor dem neuen Spiel), `aFailedFrameStopsTheGame` (Timeout mit späterem Abschluss: Abbau genau einmal, keine States) |
 | V2/V3 | behoben | Der Speicherfehlerzustand setzt `failed`; dieselben Sperren gelten. Ausstehende GPU-Arbeit entsteht dabei nicht, der Abbau läuft normal. | – |
 
 Simulierte Fence-Ergebnisse stehen jetzt in einer Warteschlange (`simulateFenceWaitResult:`), damit Frame-Wait, `wait_sync_index` und Abbau einzeln ausfallen können. Der Test-Core zählt `retro_unload_game` und `retro_deinit` und kann nach dem Frame `wait_sync_index` aufrufen (`waitsAfterFrame`).
