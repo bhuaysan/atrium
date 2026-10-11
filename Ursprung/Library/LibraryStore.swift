@@ -247,53 +247,84 @@ final class LibraryStore {
     private func apply(_ scan: LibraryScan, matches: [String: UUID], reachable: [URL], folders: [URL], context: ModelContext) {
         let existing = (try? context.fetch(FetchDescriptor<Game>())) ?? []
         let byPath = Dictionary(existing.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
-        let byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        // Overlapping folders can report a file twice. A path is applied once,
-        // so the second report never creates a fresh game over the first.
+        var result = applyROMs(scan.roms, matches: matches, existing: existing, byPath: byPath, context: context)
+        unrecognizedFiles = keepUnrecognized(scan.unrecognized, byPath: byPath, seen: &result.seen)
+        unreadableFiles = scan.unreadable
+        markMissing(existing.filter { !result.seen.contains($0.path) }, scan: scan, reachable: reachable, folders: folders)
+        try? context.save()
+
+        lastScanSummary = Self.scanSummary(found: result.seen.count, added: result.added.count, relinked: result.relinked,
+                                           missing: existing.filter(\.isMissing).count, hasUnreadable: !scan.unreadable.isEmpty)
+        if scrapesAutomatically() {
+            // New games, games whose scraping was interrupted, and missing artwork.
+            metadata.enqueue((try? context.fetch(FetchDescriptor<Game>())) ?? [], automatic: true, context: context)
+        }
+    }
+
+    /// What applying the scanned ROMs did.
+    private struct ROMUpdate {
+        /// Paths of the games the scan found.
         var seen = Set<String>()
         var added: [Game] = []
         var relinked = 0
+    }
 
-        for rom in scan.roms {
+    /// Updates known games from their files, relinks renamed and moved ones,
+    /// and adds the rest.
+    private func applyROMs(_ roms: [ScannedROM], matches: [String: UUID], existing: [Game], byPath: [String: Game],
+                           context: ModelContext) -> ROMUpdate {
+        let byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        // Overlapping folders can report a file twice. A path is applied once,
+        // so the second report never creates a fresh game over the first.
+        var update = ROMUpdate()
+        for rom in roms {
             let path = rom.url.standardizedFileURL.path(percentEncoded: false)
-            guard seen.insert(path).inserted else { continue }
+            guard update.seen.insert(path).inserted else { continue }
             if let game = byPath[path] {
-                // A system the user chose wins over detection.
-                changeSystem(of: game, to: game.systemOverride ?? rom.systemID)
-                // A file replaced at the same path may keep its size; its
-                // modification date still changes. A checksum without a known
-                // date (older libraries, unreadable dates) may belong to an
-                // earlier file and is not trusted. A zip's CRC is read on
-                // every scan, so a new value always wins.
-                let isReplaced = game.fileSize != rom.fileSize
-                    || game.fileModified == nil || game.fileModified != rom.modified
-                if isReplaced || (rom.crc32 != nil && rom.crc32 != game.crc32) { game.crc32 = rom.crc32 }
-                if game.fileSize != rom.fileSize { game.fileSize = rom.fileSize }
-                if game.fileModified != rom.modified { game.fileModified = rom.modified }
-                if game.missingSince != nil { game.missingSince = nil }
-                if game.missingTracks != rom.missingTracks { game.missingTracks = rom.missingTracks }
-            } else if let id = matches[path], let game = byID[id], !seen.contains(game.path), byPath[game.path] === game {
+                refresh(game, from: rom)
+            } else if let id = matches[path], let game = byID[id], !update.seen.contains(game.path), byPath[game.path] === game {
                 // A renamed or moved file: the game keeps its identity. The
                 // matcher compared checksums when the game had one.
                 move(game, to: path, fileName: rom.fileName, fileSize: rom.fileSize, modified: rom.modified,
                      crc32: rom.crc32 ?? game.crc32, library: existing)
-                relinked += 1
+                update.relinked += 1
             } else {
                 let game = Game(path: path, systemID: rom.systemID, title: rom.title, fileName: rom.fileName,
                                 fileSize: rom.fileSize, crc32: rom.crc32)
                 game.fileModified = rom.modified
                 game.missingTracks = rom.missingTracks
                 context.insert(game)
-                added.append(game)
+                update.added.append(game)
             }
         }
+        return update
+    }
 
-        // Files the scanner could not identify may be games of the library:
-        // added with a system of their choice, or recognized by a folder
-        // name that has changed since. Those are present, not missing, and
-        // keep their system.
+    /// A known game's file as the scan found it at the same path.
+    private func refresh(_ game: Game, from rom: ScannedROM) {
+        // A system the user chose wins over detection.
+        changeSystem(of: game, to: game.systemOverride ?? rom.systemID)
+        // A file replaced at the same path may keep its size; its
+        // modification date still changes. A checksum without a known
+        // date (older libraries, unreadable dates) may belong to an
+        // earlier file and is not trusted. A zip's CRC is read on
+        // every scan, so a new value always wins.
+        let isReplaced = game.fileSize != rom.fileSize
+            || game.fileModified == nil || game.fileModified != rom.modified
+        if isReplaced || (rom.crc32 != nil && rom.crc32 != game.crc32) { game.crc32 = rom.crc32 }
+        if game.fileSize != rom.fileSize { game.fileSize = rom.fileSize }
+        if game.fileModified != rom.modified { game.fileModified = rom.modified }
+        if game.missingSince != nil { game.missingSince = nil }
+        if game.missingTracks != rom.missingTracks { game.missingTracks = rom.missingTracks }
+    }
+
+    /// Files the scanner could not identify may be games of the library:
+    /// added with a system of their choice, or recognized by a folder name
+    /// that has changed since. Those are present, not missing, and keep their
+    /// system. Returns the files that are no game of the library.
+    private func keepUnrecognized(_ urls: [URL], byPath: [String: Game], seen: inout Set<String>) -> [URL] {
         var unrecognized: [URL] = []
-        for url in scan.unrecognized {
+        for url in urls {
             let path = url.standardizedFileURL.path(percentEncoded: false)
             if let game = byPath[path] {
                 seen.insert(path)
@@ -302,40 +333,37 @@ final class LibraryStore {
                 unrecognized.append(url)
             }
         }
-        unrecognizedFiles = unrecognized
-        unreadableFiles = scan.unreadable
+        return unrecognized
+    }
 
-        // Games whose file is gone stay in the library, marked as missing, so
-        // favourites, play time and saves survive until the file is located
-        // or the user removes the game. Games on unmounted volumes and in sub
-        // folders the scan could not read are left as they are.
+    /// Games whose file is gone stay in the library, marked as missing, so
+    /// favourites, play time and saves survive until the file is located
+    /// or the user removes the game. Games on unmounted volumes and in sub
+    /// folders the scan could not read are left as they are.
+    private func markMissing(_ unseen: [Game], scan: LibraryScan, reachable: [URL], folders: [URL]) {
         let reachablePaths = reachable.map { $0.path(percentEncoded: false) }
         let folderPaths = folders.map { $0.path(percentEncoded: false) }
-        for game in existing where !seen.contains(game.path) {
+        for game in unseen {
             if isGone(game, scan: scan, reachable: reachablePaths, folders: folderPaths) {
                 if game.missingSince == nil { game.missingSince = .now }
             } else if game.missingSince != nil, FileManager.default.fileExists(atPath: game.path) {
                 game.missingSince = nil
             }
         }
-        try? context.save()
+    }
 
-        let missing = existing.filter(\.isMissing).count
-        var summary = String(localized: "\(seen.count) games found, \(added.count) new.")
+    private static func scanSummary(found: Int, added: Int, relinked: Int, missing: Int, hasUnreadable: Bool) -> String {
+        var summary = String(localized: "\(found) games found, \(added) new.")
         if relinked > 0 {
             summary += " " + String(localized: "\(relinked) renamed or moved games were recognized.")
         }
         if missing > 0 {
             summary += " " + String(localized: "\(missing) games are missing.")
         }
-        if !scan.unreadable.isEmpty {
+        if hasUnreadable {
             summary += " " + String(localized: "Some files or folders couldn't be read; their games were kept.")
         }
-        lastScanSummary = summary
-        if scrapesAutomatically() {
-            // New games, games whose scraping was interrupted, and missing artwork.
-            metadata.enqueue((try? context.fetch(FetchDescriptor<Game>())) ?? [], automatic: true, context: context)
-        }
+        return summary
     }
 
     // MARK: Importing
