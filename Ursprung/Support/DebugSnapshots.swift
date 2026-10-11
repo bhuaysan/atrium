@@ -8,8 +8,7 @@ import AppKit
 /// changes from scripts without screen recording permissions.
 enum DebugSnapshots {
     static func startIfRequested() {
-        guard let path = ProcessInfo.processInfo.environment["URSPRUNG_SNAPSHOT_DIR"] else { return }
-        let directory = URL(filePath: path, directoryHint: .isDirectory)
+        guard let directory = DebugEnvironment.snapshotDirectory else { return }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
             MainActor.assumeIsolated {

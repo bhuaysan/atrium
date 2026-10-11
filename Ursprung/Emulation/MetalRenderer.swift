@@ -558,7 +558,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
     private var lastDebugSnapshot: CFTimeInterval = 0
 
     private func writeDebugSnapshot(of texture: MTLTexture, in buffer: MTLCommandBuffer) {
-        guard let name = debugSnapshotName, let path = ProcessInfo.processInfo.environment["URSPRUNG_SNAPSHOT_DIR"],
+        guard let name = debugSnapshotName, let directory = DebugEnvironment.snapshotDirectory,
               CACurrentMediaTime() - lastDebugSnapshot >= 2 else { return }
         let width = texture.width, height = texture.height, bytesPerRow = width * 4
         guard let copy = device.makeBuffer(length: bytesPerRow * height, options: .storageModeShared),
@@ -568,7 +568,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
                   sourceSize: MTLSize(width: width, height: height, depth: 1), to: copy, destinationOffset: 0,
                   destinationBytesPerRow: bytesPerRow, destinationBytesPerImage: bytesPerRow * height)
         blit.endEncoding()
-        let url = URL(filePath: path, directoryHint: .isDirectory).appending(path: "\(name).png")
+        let url = directory.appending(path: "\(name).png")
         // Only read after the GPU is done with it.
         nonisolated(unsafe) let pixels = copy
         buffer.addCompletedHandler { _ in

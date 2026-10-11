@@ -186,10 +186,7 @@ final class ShaderWorkspace {
         self.reload = reload
         #if DEBUG
         // Development aid: URSPRUNG_SHADER_PARAMS=NAME=value,… changes parameters of every preset that loads.
-        for pair in (ProcessInfo.processInfo.environment["URSPRUNG_SHADER_PARAMS"] ?? "").split(separator: ",") {
-            let parts = pair.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-            if parts.count == 2, let value = Float(parts[1]) { setValue(value, for: parts[0]) }
-        }
+        for parameter in DebugEnvironment.shaderParameters { setValue(parameter.value, for: parameter.name) }
         #endif
     }
 
