@@ -22,16 +22,8 @@ struct PlayerView: View {
     @State private var preferencesRevision = 0
     @AppStorage(PrefKey.showFPS) private var showFPS = false
     @AppStorage(PrefKey.settingsTab) private var settingsTab = SettingsTab.general
-    /// The pause menu is in the view tree; it fades in with its insertion
-    /// transition.
-    @State private var showsMenu = false
-    /// The pause menu is fading out. A removal transition is never animated
-    /// here, so closing animates the opacity and removes the views afterwards.
-    @State private var isMenuClosing = false
-    /// The shader panel is in the view tree; like the menu, it animates its
-    /// closing by hand.
-    @State private var showsShaderPanel = false
-    @State private var isShaderPanelClosing = false
+    @State private var menu = PanelPresence()
+    @State private var shaderPanel = PanelPresence()
 
     var body: some View {
         ZStack {
@@ -60,28 +52,28 @@ struct PlayerView: View {
                 .fill(.black.opacity(reduceTransparency ? 0.7 : 0.5))
                 .ignoresSafeArea()
                 .onTapGesture { session.isMenuVisible = false }
-                .opacity(showsMenu && !isMenuClosing ? 1 : 0)
-                .allowsHitTesting(showsMenu && !isMenuClosing)
+                .opacity(menu.isVisible ? 1 : 0)
+                .allowsHitTesting(menu.isVisible)
                 .accessibilityHidden(true)
-            if showsMenu {
+            if menu.isPresent {
                 GeometryReader { geometry in
                     PauseMenuView(maxHeight: min(600, geometry.size.height - 80), close: closePlayer)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .transition(.appFade(or: .opacity.combined(with: .scale(scale: 0.97)), reduceMotion: reduceMotion))
-                .scaleEffect(isMenuClosing && !reduceMotion ? 0.97 : 1)
-                .opacity(isMenuClosing ? 0 : 1)
-                .allowsHitTesting(!isMenuClosing)
+                .scaleEffect(menu.isClosing && !reduceMotion ? 0.97 : 1)
+                .opacity(menu.isClosing ? 0 : 1)
+                .allowsHitTesting(!menu.isClosing)
             }
         }
         .overlay(alignment: .topTrailing) {
-            if showsShaderPanel {
+            if shaderPanel.isPresent {
                 ShaderPanel()
                     .padding(AppSpacing.l)
                     .transition(.appFade(or: .move(edge: .trailing).combined(with: .opacity), reduceMotion: reduceMotion))
-                    .offset(x: isShaderPanelClosing && !reduceMotion ? 40 : 0)
-                    .opacity(isShaderPanelClosing ? 0 : 1)
-                    .allowsHitTesting(!isShaderPanelClosing)
+                    .offset(x: shaderPanel.isClosing && !reduceMotion ? 40 : 0)
+                    .opacity(shaderPanel.isClosing ? 0 : 1)
+                    .allowsHitTesting(!shaderPanel.isClosing)
             }
         }
         .overlay(alignment: .top) {
@@ -89,34 +81,10 @@ struct PlayerView: View {
                 .padding(.top, AppSpacing.l)
         }
         .overlay(alignment: .topTrailing) {
-            // Indicators that stay while their mode is on.
-            VStack(alignment: .trailing, spacing: 6) {
-                if showFPS, session.phase == .running {
-                    HUDCapsule {
-                        Text("\(session.measuredFPS, format: .number.precision(.fractionLength(1))) fps")
-                            .font(.caption.monospacedDigit())
-                    }
-                }
-                if session.isFastForwarding {
-                    HUDCapsule { Label("Fast Forward", systemImage: "forward.fill") }
-                        .transition(.opacity)
-                }
-                if session.isRewinding {
-                    HUDCapsule { Label("Rewind", systemImage: "backward.fill") }
-                        .transition(.opacity)
-                }
-                if session.isTyping {
-                    HUDCapsule { Label("Typing", systemImage: "keyboard") }
-                        .transition(.opacity)
-                }
-                if session.isHardcore {
-                    HUDCapsule { Label("Hardcore", systemImage: "trophy.fill") }
-                        .transition(.opacity)
-                }
-            }
-            .padding(AppSpacing.l)
-            // Beside the shader panel, which takes the corner.
-            .padding(.trailing, showsShaderPanel ? 320 + AppSpacing.l : 0)
+            ModeIndicators(showsFPS: showFPS)
+                .padding(AppSpacing.l)
+                // Beside the shader panel, which takes the corner.
+                .padding(.trailing, shaderPanel.isPresent ? 320 + AppSpacing.l : 0)
         }
         .overlay(alignment: .bottomTrailing) {
             AchievementIndicators(indicators: session.achievementIndicators)
@@ -133,37 +101,10 @@ struct PlayerView: View {
         .navigationTitle(session.gameTitle)
         .toolbar(session.phase == .running && !session.isMenuVisible ? .hidden : .automatic, for: .windowToolbar)
         .onChange(of: session.isMenuVisible, initial: true) { _, visible in
-            if visible {
-                withAppAnimation(AppAnimation.panel, reduceMotion: reduceMotion) {
-                    showsMenu = true
-                    isMenuClosing = false
-                }
-            } else if showsMenu {
-                withAppAnimation(AppAnimation.panel, reduceMotion: reduceMotion) {
-                    isMenuClosing = true
-                } completion: {
-                    // Reopened meanwhile: keep it.
-                    guard !session.isMenuVisible else { return }
-                    showsMenu = false
-                    isMenuClosing = false
-                }
-            }
+            animate($menu, toVisible: visible) { session.isMenuVisible }
         }
         .onChange(of: session.isShaderPanelVisible) { _, visible in
-            if visible {
-                withAppAnimation(AppAnimation.panel, reduceMotion: reduceMotion) {
-                    showsShaderPanel = true
-                    isShaderPanelClosing = false
-                }
-            } else if showsShaderPanel {
-                withAppAnimation(AppAnimation.panel, reduceMotion: reduceMotion) {
-                    isShaderPanelClosing = true
-                } completion: {
-                    guard !session.isShaderPanelVisible else { return }
-                    showsShaderPanel = false
-                    isShaderPanelClosing = false
-                }
-            }
+            animate($shaderPanel, toVisible: visible) { session.isShaderPanelVisible }
         }
         .onDisappear {
             // A standalone emulator's game closed the player; it keeps running.
@@ -192,9 +133,7 @@ struct PlayerView: View {
         if let draft = session.shader.editorPreset { return .preset(draft) }
         #if DEBUG
         // Development aid: URSPRUNG_SHADER=<filter|preset:library/…|preset:user/…> replaces the choice.
-        if let value = ProcessInfo.processInfo.environment["URSPRUNG_SHADER"], let selection = ShaderSelection(rawValue: value) {
-            return selection
-        }
+        if let selection = DebugEnvironment.shader { return selection }
         #endif
         _ = (preferencesRevision, globalFilter)
         return ShaderSelection.current(for: session.systemID, gameID: session.runningGameID)
@@ -206,6 +145,21 @@ struct PlayerView: View {
         return session.systemID.flatMap { BezelImages.image(for: $0) }
     }
 
+    /// Fades a panel in, or out and then removes it, unless `isWanted`
+    /// reports it was reopened while it faded.
+    private func animate(_ presence: Binding<PanelPresence>, toVisible visible: Bool, isWanted: @escaping () -> Bool) {
+        if visible {
+            withAppAnimation(AppAnimation.panel, reduceMotion: reduceMotion) { presence.wrappedValue.show() }
+        } else if presence.wrappedValue.isPresent {
+            withAppAnimation(AppAnimation.panel, reduceMotion: reduceMotion) {
+                presence.wrappedValue.beginClosing()
+            } completion: {
+                guard !isWanted() else { return }
+                presence.wrappedValue.remove()
+            }
+        }
+    }
+
     private func closePlayer() {
         dismissWindow(id: WindowID.player)
     }
@@ -213,6 +167,65 @@ struct PlayerView: View {
     private func open(_ tab: SettingsTab?) {
         if let tab { settingsTab = tab }
         openSettings()
+    }
+}
+
+/// A panel the player shows and hides by hand. It fades in with its
+/// insertion transition; a removal transition is never animated here, so
+/// closing fades it out and removes its views afterwards.
+private struct PanelPresence {
+    /// The panel is in the view tree.
+    private(set) var isPresent = false
+    /// The panel is fading out.
+    private(set) var isClosing = false
+
+    var isVisible: Bool { isPresent && !isClosing }
+
+    mutating func show() {
+        isPresent = true
+        isClosing = false
+    }
+
+    mutating func beginClosing() {
+        isClosing = true
+    }
+
+    mutating func remove() {
+        isPresent = false
+        isClosing = false
+    }
+}
+
+/// Indicators that stay while their mode is on.
+private struct ModeIndicators: View {
+    @Environment(EmulationSession.self) private var session
+    let showsFPS: Bool
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            if showsFPS, session.phase == .running {
+                HUDCapsule {
+                    Text("\(session.measuredFPS, format: .number.precision(.fractionLength(1))) fps")
+                        .font(.caption.monospacedDigit())
+                }
+            }
+            if session.isFastForwarding {
+                HUDCapsule { Label("Fast Forward", systemImage: "forward.fill") }
+                    .transition(.opacity)
+            }
+            if session.isRewinding {
+                HUDCapsule { Label("Rewind", systemImage: "backward.fill") }
+                    .transition(.opacity)
+            }
+            if session.isTyping {
+                HUDCapsule { Label("Typing", systemImage: "keyboard") }
+                    .transition(.opacity)
+            }
+            if session.isHardcore {
+                HUDCapsule { Label("Hardcore", systemImage: "trophy.fill") }
+                    .transition(.opacity)
+            }
+        }
     }
 }
 
