@@ -310,57 +310,9 @@ static URLibretroCore *gUnfinishedCore = nil;
 #pragma mark - Lifecycle
 
 - (BOOL)loadGameAtPath:(NSString *)path error:(NSError **)error {
-    URLibretroCore *unfinished = gUnfinishedCore;
-    if (unfinished && ![unfinished finishUnloading]) {
-        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:7 userInfo:@{
-            NSLocalizedDescriptionKey: @"The graphics card is still busy with the previous game. Quit and reopen Ursprung to play again."
-        }];
-        return NO;
-    }
-    if (gActiveCore && gActiveCore != self) {
-        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:4 userInfo:@{
-            NSLocalizedDescriptionKey: @"Another game is already running."
-        }];
-        return NO;
-    }
-    gActiveCore = self;
-
-    free(_systemDirC); _systemDirC = strdup(self.systemDirectory.fileSystemRepresentation);
-    free(_saveDirC); _saveDirC = strdup(self.saveDirectory.fileSystemRepresentation);
-    free(_corePathC); _corePathC = strdup(self.path.fileSystemRepresentation);
-    free(_gamePathC); _gamePathC = strdup(path.fileSystemRepresentation);
-    free(_usernameC); _usernameC = strdup(NSUserName().UTF8String ?: "Player");
-
-    for (NSInteger port = 0; port < URMaxPorts; port++) {
-        atomic_store(&gButtonMasks[port], 0);
-        atomic_store(&gTurboMasks[port], 0);
-        for (int s = 0; s < 2; s++) {
-            atomic_store(&gAnalog[port][s][0], 0);
-            atomic_store(&gAnalog[port][s][1], 0);
-        }
-    }
-
-    extern bool URCoreEnvironment(unsigned cmd, void *data);
-    extern void URCoreVideoRefresh(const void *data, unsigned width, unsigned height, size_t pitch);
-    extern void URCoreAudioSample(int16_t left, int16_t right);
-    extern size_t URCoreAudioSampleBatch(const int16_t *data, size_t frames);
-    extern void URCoreInputPoll(void);
-    extern int16_t URCoreInputState(unsigned port, unsigned device, unsigned index, unsigned id);
-
-    for (unsigned key = 0; key < RETROK_LAST; key++) atomic_store(&gKeys[key], false);
-    atomic_store(&gTurboReleased, false);
-    memset(&_hwRender, 0, sizeof(_hwRender));
-    _wantsVulkan = NO;
-    _vulkanNegotiation = NULL;
-
-    _sym.set_environment(URCoreEnvironment);
-    _sym.init();
-    _initialized = YES;
-    _sym.set_video_refresh(URCoreVideoRefresh);
-    _sym.set_audio_sample(URCoreAudioSample);
-    _sym.set_audio_sample_batch(URCoreAudioSampleBatch);
-    _sym.set_input_poll(URCoreInputPoll);
-    _sym.set_input_state(URCoreInputState);
+    if (![self becomeActiveCoreWithError:error]) return NO;
+    [self resetFrontendStateForGameAtPath:path];
+    [self initializeCore];
 
     struct retro_game_info game = {0};
     game.path = _gamePathC;
@@ -391,10 +343,87 @@ static URLibretroCore *gUnfinishedCore = nil;
         _sym.set_controller_port_device(port, RETRO_DEVICE_JOYPAD);
     }
 
+    if (![self startHardwareRenderingWithError:error]) {
+        // Not -unloadGame: save RAM is not loaded yet and must not be written.
+        _sym.unload_game();
+        _gameLoaded = NO;
+        [self teardownAfterFailedLoad];
+        return NO;
+    }
+
+    [self loadSaveRAM];
+    return YES;
+}
+
+/// Only one core runs at a time: its callbacks are global C functions. A
+/// previous core whose GPU work had not finished is unloaded first.
+- (BOOL)becomeActiveCoreWithError:(NSError **)error {
+    URLibretroCore *unfinished = gUnfinishedCore;
+    if (unfinished && ![unfinished finishUnloading]) {
+        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:7 userInfo:@{
+            NSLocalizedDescriptionKey: @"The graphics card is still busy with the previous game. Quit and reopen Ursprung to play again."
+        }];
+        return NO;
+    }
+    if (gActiveCore && gActiveCore != self) {
+        if (error) *error = [NSError errorWithDomain:URCoreErrorDomain code:4 userInfo:@{
+            NSLocalizedDescriptionKey: @"Another game is already running."
+        }];
+        return NO;
+    }
+    gActiveCore = self;
+    return YES;
+}
+
+/// The paths the core asks for, released input and no hardware rendering
+/// until the core requests it.
+- (void)resetFrontendStateForGameAtPath:(NSString *)path {
+    free(_systemDirC); _systemDirC = strdup(self.systemDirectory.fileSystemRepresentation);
+    free(_saveDirC); _saveDirC = strdup(self.saveDirectory.fileSystemRepresentation);
+    free(_corePathC); _corePathC = strdup(self.path.fileSystemRepresentation);
+    free(_gamePathC); _gamePathC = strdup(path.fileSystemRepresentation);
+    free(_usernameC); _usernameC = strdup(NSUserName().UTF8String ?: "Player");
+
+    for (NSInteger port = 0; port < URMaxPorts; port++) {
+        atomic_store(&gButtonMasks[port], 0);
+        atomic_store(&gTurboMasks[port], 0);
+        for (int s = 0; s < 2; s++) {
+            atomic_store(&gAnalog[port][s][0], 0);
+            atomic_store(&gAnalog[port][s][1], 0);
+        }
+    }
+    for (unsigned key = 0; key < RETROK_LAST; key++) atomic_store(&gKeys[key], false);
+    atomic_store(&gTurboReleased, false);
+    memset(&_hwRender, 0, sizeof(_hwRender));
+    _wantsVulkan = NO;
+    _vulkanNegotiation = NULL;
+}
+
+/// Hands the core the frontend's callbacks and initializes it.
+- (void)initializeCore {
+    extern bool URCoreEnvironment(unsigned cmd, void *data);
+    extern void URCoreVideoRefresh(const void *data, unsigned width, unsigned height, size_t pitch);
+    extern void URCoreAudioSample(int16_t left, int16_t right);
+    extern size_t URCoreAudioSampleBatch(const int16_t *data, size_t frames);
+    extern void URCoreInputPoll(void);
+    extern int16_t URCoreInputState(unsigned port, unsigned device, unsigned index, unsigned id);
+
+    _sym.set_environment(URCoreEnvironment);
+    _sym.init();
+    _initialized = YES;
+    _sym.set_video_refresh(URCoreVideoRefresh);
+    _sym.set_audio_sample(URCoreAudioSample);
+    _sym.set_audio_sample_batch(URCoreAudioSampleBatch);
+    _sym.set_input_poll(URCoreInputPoll);
+    _sym.set_input_state(URCoreInputState);
+}
+
+/// Sets up the OpenGL or Vulkan context the core asked for while loading
+/// the game, and lets the core create its resources in it.
+- (BOOL)startHardwareRenderingWithError:(NSError **)error {
     if (_gl) {
         [_gl makeCurrent];
         [_gl resizeFramebufferWidth:_avInfo.geometry.max_width height:_avInfo.geometry.max_height];
-        if (_hwRender.context_reset) _hwRender.context_reset();
     } else if (_wantsVulkan) {
         NSError *vulkanError = nil;
         _vulkan = [[URVulkanContext alloc] initWithNegotiation:_vulkanNegotiation error:&vulkanError];
@@ -403,16 +432,12 @@ static URLibretroCore *gUnfinishedCore = nil;
                 NSLocalizedDescriptionKey: [NSString stringWithFormat:@"The core needs Vulkan, which could not be started: %@",
                                             vulkanError.localizedDescription]
             }];
-            // Not -unloadGame: save RAM is not loaded yet and must not be written.
-            _sym.unload_game();
-            _gameLoaded = NO;
-            [self teardownAfterFailedLoad];
             return NO;
         }
-        if (_hwRender.context_reset) _hwRender.context_reset();
+    } else {
+        return YES;
     }
-
-    [self loadSaveRAM];
+    if (_hwRender.context_reset) _hwRender.context_reset();
     return YES;
 }
 
@@ -1055,6 +1080,85 @@ static void URRegisterVariables(URLibretroCore *core, const struct retro_variabl
     }
 }
 
+/// The libretro language for the user's language code; English when the core can't tell it apart.
+static unsigned URRetroLanguage(NSString *code) {
+    if ([code hasPrefix:@"de"]) return RETRO_LANGUAGE_GERMAN;
+    if ([code hasPrefix:@"fr"]) return RETRO_LANGUAGE_FRENCH;
+    if ([code hasPrefix:@"es"]) return RETRO_LANGUAGE_SPANISH;
+    if ([code hasPrefix:@"it"]) return RETRO_LANGUAGE_ITALIAN;
+    if ([code hasPrefix:@"ja"]) return RETRO_LANGUAGE_JAPANESE;
+    return RETRO_LANGUAGE_ENGLISH;
+}
+
+static void URFillPerfInterface(struct retro_perf_callback *cb) {
+    cb->get_time_usec = URPerfGetTimeUsec;
+    cb->get_cpu_features = URPerfGetCPUFeatures;
+    cb->get_perf_counter = URPerfGetCounter;
+    cb->perf_register = URPerfRegister;
+    cb->perf_start = URPerfStart;
+    cb->perf_stop = URPerfStop;
+    cb->perf_log = URPerfLog;
+}
+
+/// RETRO_ENVIRONMENT_SET_HW_RENDER: Vulkan is set up once the game is
+/// loaded, OpenGL right away. False for APIs this Mac lacks, so the core
+/// can fall back to another one or to software rendering.
+static bool URSetHWRender(URLibretroCore *core, struct retro_hw_render_callback *hw) {
+    if (hw->context_type == RETRO_HW_CONTEXT_VULKAN) {
+        // The context is created once the game is loaded; refusing
+        // here lets the core fall back to OpenGL or software.
+        if (!URVulkanContext.isAvailable) return false;
+        hw->get_current_framebuffer = NULL;
+        hw->get_proc_address = NULL;
+        core->_hwRender = *hw;
+        core->_gl = nil;
+        core->_wantsVulkan = YES;
+        return true;
+    }
+    BOOL coreProfile;
+    if (hw->context_type == RETRO_HW_CONTEXT_OPENGL_CORE) {
+        coreProfile = YES;
+    } else if (hw->context_type == RETRO_HW_CONTEXT_OPENGL) {
+        coreProfile = NO;
+    } else {
+        return false; // GLES / Direct3D are not available.
+    }
+    NSError *error = nil;
+    URGLContext *gl = [[URGLContext alloc] initWithCoreProfile:coreProfile depth:hw->depth stencil:hw->stencil error:&error];
+    if (!gl) {
+        URCoreLogPrintf(RETRO_LOG_ERROR, "%s", error.localizedDescription.UTF8String);
+        return false;
+    }
+    [gl makeCurrent];
+    hw->get_current_framebuffer = URCoreHWGetFramebuffer;
+    hw->get_proc_address = URCoreHWGetProcAddress;
+    core->_hwRender = *hw;
+    core->_gl = gl;
+    core->_wantsVulkan = NO;
+    return true;
+}
+
+/// RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: new timing and geometry; the
+/// OpenGL frame buffer grows to the new maximum size.
+static void URSetSystemAVInfo(URLibretroCore *core, const struct retro_system_av_info *info) {
+    core->_avInfo = *info;
+    [core sanitizeAVInfo];
+    if (core->_gl) {
+        [core->_gl resizeFramebufferWidth:MAX(core->_gl.framebufferWidth, info->geometry.max_width)
+                                   height:MAX(core->_gl.framebufferHeight, info->geometry.max_height)];
+    }
+    atomic_store(&core->_avInfoChanged, true);
+}
+
+/// Keeps the core's disc control callbacks; the basic interface is the
+/// extended one without its trailing members. NULL removes them.
+static void URSetDiskControl(URLibretroCore *core, const void *callbacks, size_t size) {
+    memset(&core->_disk, 0, sizeof(core->_disk));
+    if (callbacks) memcpy(&core->_disk, callbacks, size);
+    core->_hasDiskControl = callbacks && core->_disk.get_num_images && core->_disk.set_image_index
+        && core->_disk.set_eject_state;
+}
+
 bool URCoreEnvironment(unsigned cmd, void *data) {
     URLibretroCore *core = gActiveCore;
     if (!core) return false;
@@ -1136,17 +1240,9 @@ bool URCoreEnvironment(unsigned cmd, void *data) {
             *(const char **)data = core->_usernameC;
             return true;
 
-        case RETRO_ENVIRONMENT_GET_LANGUAGE: {
-            NSString *lang = core.languageCode;
-            unsigned value = RETRO_LANGUAGE_ENGLISH;
-            if ([lang hasPrefix:@"de"]) value = RETRO_LANGUAGE_GERMAN;
-            else if ([lang hasPrefix:@"fr"]) value = RETRO_LANGUAGE_FRENCH;
-            else if ([lang hasPrefix:@"es"]) value = RETRO_LANGUAGE_SPANISH;
-            else if ([lang hasPrefix:@"it"]) value = RETRO_LANGUAGE_ITALIAN;
-            else if ([lang hasPrefix:@"ja"]) value = RETRO_LANGUAGE_JAPANESE;
-            *(unsigned *)data = value;
+        case RETRO_ENVIRONMENT_GET_LANGUAGE:
+            *(unsigned *)data = URRetroLanguage(core.languageCode);
             return true;
-        }
 
         case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: {
             enum retro_pixel_format format = *(const enum retro_pixel_format *)data;
@@ -1242,17 +1338,9 @@ bool URCoreEnvironment(unsigned cmd, void *data) {
             return true;
         }
 
-        case RETRO_ENVIRONMENT_GET_PERF_INTERFACE: {
-            struct retro_perf_callback *cb = data;
-            cb->get_time_usec = URPerfGetTimeUsec;
-            cb->get_cpu_features = URPerfGetCPUFeatures;
-            cb->get_perf_counter = URPerfGetCounter;
-            cb->perf_register = URPerfRegister;
-            cb->perf_start = URPerfStart;
-            cb->perf_stop = URPerfStop;
-            cb->perf_log = URPerfLog;
+        case RETRO_ENVIRONMENT_GET_PERF_INTERFACE:
+            URFillPerfInterface(data);
             return true;
-        }
 
         case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: {
             struct retro_rumble_interface *rumble = data;
@@ -1267,17 +1355,9 @@ bool URCoreEnvironment(unsigned cmd, void *data) {
             return true;
         }
 
-        case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: {
-            const struct retro_system_av_info *info = data;
-            core->_avInfo = *info;
-            [core sanitizeAVInfo];
-            if (core->_gl) {
-                [core->_gl resizeFramebufferWidth:MAX(core->_gl.framebufferWidth, info->geometry.max_width)
-                                           height:MAX(core->_gl.framebufferHeight, info->geometry.max_height)];
-            }
-            atomic_store(&core->_avInfoChanged, true);
+        case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
+            URSetSystemAVInfo(core, data);
             return true;
-        }
 
         case RETRO_ENVIRONMENT_SET_GEOMETRY: {
             const struct retro_game_geometry *geometry = data;
@@ -1292,41 +1372,8 @@ bool URCoreEnvironment(unsigned cmd, void *data) {
                 ? RETRO_HW_CONTEXT_VULKAN : RETRO_HW_CONTEXT_OPENGL_CORE;
             return true;
 
-        case RETRO_ENVIRONMENT_SET_HW_RENDER: {
-            struct retro_hw_render_callback *hw = data;
-            if (hw->context_type == RETRO_HW_CONTEXT_VULKAN) {
-                // The context is created once the game is loaded; refusing
-                // here lets the core fall back to OpenGL or software.
-                if (!URVulkanContext.isAvailable) return false;
-                hw->get_current_framebuffer = NULL;
-                hw->get_proc_address = NULL;
-                core->_hwRender = *hw;
-                core->_gl = nil;
-                core->_wantsVulkan = YES;
-                return true;
-            }
-            BOOL coreProfile;
-            if (hw->context_type == RETRO_HW_CONTEXT_OPENGL_CORE) {
-                coreProfile = YES;
-            } else if (hw->context_type == RETRO_HW_CONTEXT_OPENGL) {
-                coreProfile = NO;
-            } else {
-                return false; // GLES / Direct3D are not available.
-            }
-            NSError *error = nil;
-            URGLContext *gl = [[URGLContext alloc] initWithCoreProfile:coreProfile depth:hw->depth stencil:hw->stencil error:&error];
-            if (!gl) {
-                URCoreLogPrintf(RETRO_LOG_ERROR, "%s", error.localizedDescription.UTF8String);
-                return false;
-            }
-            [gl makeCurrent];
-            hw->get_current_framebuffer = URCoreHWGetFramebuffer;
-            hw->get_proc_address = URCoreHWGetProcAddress;
-            core->_hwRender = *hw;
-            core->_gl = gl;
-            core->_wantsVulkan = NO;
-            return true;
-        }
+        case RETRO_ENVIRONMENT_SET_HW_RENDER:
+            return URSetHWRender(core, data);
 
         case RETRO_ENVIRONMENT_GET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_SUPPORT: {
             struct retro_hw_render_context_negotiation_interface *iface = data;
@@ -1356,21 +1403,13 @@ bool URCoreEnvironment(unsigned cmd, void *data) {
             *(unsigned *)data = 1;
             return true;
 
-        case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE: {
-            const struct retro_disk_control_callback *cb = data;
-            memset(&core->_disk, 0, sizeof(core->_disk));
-            if (cb) memcpy(&core->_disk, cb, sizeof(*cb));
-            core->_hasDiskControl = cb && cb->get_num_images && cb->set_image_index && cb->set_eject_state;
+        case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
+            URSetDiskControl(core, data, sizeof(struct retro_disk_control_callback));
             return true;
-        }
 
-        case RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE: {
-            const struct retro_disk_control_ext_callback *cb = data;
-            memset(&core->_disk, 0, sizeof(core->_disk));
-            if (cb) core->_disk = *cb;
-            core->_hasDiskControl = cb && cb->get_num_images && cb->set_image_index && cb->set_eject_state;
+        case RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE:
+            URSetDiskControl(core, data, sizeof(struct retro_disk_control_ext_callback));
             return true;
-        }
 
         case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
             if (data) *(int *)data = (atomic_load(&core->_videoEnabled) ? 1 : 0) | (atomic_load(&core->_audioEnabled) ? 2 : 0);
