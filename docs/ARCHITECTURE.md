@@ -313,8 +313,10 @@ bindings and hotkeys) into the file so ARMSX2's other settings survive.
 resume state), SIGKILL after 10 s. `PINEClient` talks to ARMSX2's PINE socket
 in a folder of its own per launch (`TMPDIR` of the child) for status, the
 first frame and save/load state; stopping waits for a save under way.
-`EmulationSession` has a `.external` phase instead of the player window. "Open ARMSX2 Settings" starts ARMSX2 with its own window
-on the same data folder; a game launch quits it first.
+`EmulationSession` has a `.external` phase instead of the player window; the
+running emulator's process, folders and PINE connection are one `ExternalRun`.
+"Open ARMSX2 Settings" starts ARMSX2 with its own window on the same data
+folder (`StandaloneSettingsWindow`); a game launch quits it first.
 
 `BIOSManager` verifies BIOS files by MD5 and, on import, renames files to the
 name the core expects (e.g. `SCPH1001.BIN` → `scph1001.bin`). PS2 dumps are a

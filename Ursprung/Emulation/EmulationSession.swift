@@ -55,6 +55,25 @@ final class EmulationSession {
         case unavailable
     }
 
+    /// A game running in a standalone emulator while `phase == .external`.
+    private struct ExternalRun {
+        let process: ExternalSession
+        /// The game's state folder, and the emulator's log for when it ends.
+        var stateFolder: URL?
+        var log: URL?
+        /// The save state format of the emulator version that runs.
+        var saveStateVersion: UInt32?
+        var pine: PINEClient?
+        /// Connects to PINE and waits for the game's first frame.
+        var pineTask: Task<Void, Never>?
+        /// Save and load go through PINE while `control == .ready`.
+        var control: ExternalControl?
+        /// The save or load under way; a stop waits for it.
+        var stateTask: Task<Void, Never>?
+        /// The game has shown its first frame (PINE's frame counter).
+        var hasStarted = false
+    }
+
     struct Toast: Identifiable, Equatable {
         enum Kind { case info, saved, loaded, warning, screenshot, achievement }
         let id = UUID()
@@ -147,32 +166,19 @@ final class EmulationSession {
 
     private(set) var core: LibretroCore?
     private var runner: EmulationRunner?
-    /// The standalone emulator's process while `phase == .external`.
-    private var external: ExternalSession?
-    /// Its state folder and log, for cleaning up when it ends.
-    private var externalStateFolder: URL?
-    private var externalLog: URL?
-    /// Save and load go through PINE while `externalControl == .ready`.
-    private(set) var externalControl: ExternalControl?
+    /// The standalone emulator's game; nil unless `phase == .external`
+    /// or the emulator still quits.
+    private var externalRun: ExternalRun?
+    /// Save and load go through PINE while this is `.ready`.
+    var externalControl: ExternalControl? { externalRun?.control }
     /// A save or load through PINE is under way.
-    private(set) var isExternalStateBusy = false
-    /// The save or load under way; a stop waits for it.
-    private var externalStateTask: Task<Void, Never>?
-    private var pine: PINEClient?
-    private var pineTask: Task<Void, Never>?
+    var isExternalStateBusy: Bool { externalRun?.stateTask != nil }
+    /// The standalone emulator's game has shown its first frame.
+    var hasExternalGameStarted: Bool { externalRun?.hasStarted ?? false }
     /// Watches the running game's state folder while `phase == .external`.
     @ObservationIgnored private lazy var stateWatcher = LibraryWatcher { [weak self] in self?.reloadSlots() }
-    /// The save state format of the emulator version that runs.
-    private var externalSaveStateVersion: UInt32?
-    /// The game has shown its first frame (PINE's frame counter).
-    private var externalHasStarted = false
-    /// A standalone emulator opened with its own window, for its settings.
-    private var standaloneSettings: ExternalSession?
     /// The game a launch is starting, until the next launch or stop.
     private var requestedGameUUID: UUID?
-    /// The emulator whose own window is open or opening.
-    private(set) var standaloneSettingsID: String?
-    private var standaloneSettingsOpening: Task<Void, any Error>?
     private var gameUUID: UUID?
     private var coreID: String?
     /// Where the running game's states live below its folder: the core, or
@@ -194,6 +200,8 @@ final class EmulationSession {
     private var autosave: (@Sendable (LibretroCore) -> Void)?
 
     let input = InputRouter()
+    /// A standalone emulator's own window, for its settings.
+    let standaloneSettings = StandaloneSettingsWindow()
     /// The preset the player renders, with its live parameters.
     let shader = ShaderWorkspace()
     let cores: CoreManager
@@ -226,11 +234,11 @@ final class EmulationSession {
             MainActor.assumeIsolated {
                 // Flush battery saves and play time before the process exits.
                 self?.runner?.stopAndWait()
-                if let external = self?.external {
+                if let external = self?.externalRun?.process {
                     let exit = external.stopAndWait()
                     self?.finishExternal(cleanExit: exit?.isClean ?? false, context: nil)
                 }
-                self?.standaloneSettings?.stopAndWait()
+                self?.standaloneSettings.stopAndWait()
                 self?.recordPlayTime(context: nil)
             }
         }
@@ -274,6 +282,23 @@ final class EmulationSession {
         coreID = definition.id
         coreName = definition.name
 
+        guard await checkFiles(of: game, system: system, definition: definition, context: context, generation: generation) else {
+            return
+        }
+        if let emulator = definition.standalone {
+            await launch(game, in: emulator, system: system, resume: resume, state: state?.stateURL, context: context,
+                         generation: generation)
+        } else {
+            await launch(game, with: definition, system: system, resume: resume, state: state, context: context,
+                         generation: generation)
+        }
+    }
+
+    /// Fails the launch when files of the game's disc or BIOS files the core
+    /// needs are missing. False also when another launch or a stop superseded
+    /// this one meanwhile.
+    private func checkFiles(of game: Game, system: GameSystem, definition: CoreDefinition, context: ModelContext,
+                            generation: Int) async -> Bool {
         // Tracks may have been added or removed since the last scan.
         let missingTracks = LibraryScanner.missingTracks(of: game.fileURL)
         if game.missingTracks != missingTracks {
@@ -282,25 +307,26 @@ final class EmulationSession {
         }
         if !game.missingTracks.isEmpty {
             phase = .failed(Failure(message: String(localized: "Files of this disc are missing: \(game.missingTracks.joined(separator: ", ")). Put them next to “\(game.fileName)”, then rescan.")))
-            return
+            return false
         }
 
         await bios.refresh()
-        guard generation == self.generation else { return }
+        guard generation == self.generation else { return false }
         let missing = bios.missingDescriptions(for: system, coreID: definition.id)
         if !missing.isEmpty {
             let names = missing.joined(separator: ", ")
             phase = .failed(Failure(message: String(localized: "\(definition.name) needs BIOS files that are missing: \(names). Import them in Settings → BIOS, or choose another core."),
                                     settingsTab: .bios))
-            return
+            return false
         }
+        return true
+    }
 
-        if let emulator = definition.standalone {
-            await launch(game, in: emulator, system: system, resume: resume, state: state?.stateURL, context: context,
-                         generation: generation)
-            return
-        }
-
+    /// Starts `game` in the libretro core `definition`: installs and loads
+    /// the core, prepares the file, starts the emulation thread and loads
+    /// the game on it.
+    private func launch(_ game: Game, with definition: CoreDefinition, system: GameSystem, resume: Bool,
+                        state: SaveStateSlot?, context: ModelContext, generation: Int) async {
         // Errors until the core is loaded are fixed in Settings → Cores.
         var settingsTab: SettingsTab? = .cores
         do {
@@ -313,94 +339,22 @@ final class EmulationSession {
             settingsTab = nil
 
             phase = .preparing(String(localized: "Loading game…"))
-            var contentURL = try await prepareContent(for: game, system: system, core: core)
-            try checkCurrent(generation)
-            var contentCRC = game.crc32
-            let patch = system.supportsPatches ? PatchStore.active(in: AppPaths.extras, gameID: game.id) : nil
-            if let patch {
-                do {
-                    let patched = try await Self.patch(contentURL, with: patch,
-                                                       into: AppPaths.extracted.appending(path: "\(game.id.uuidString)-patched"))
-                    contentURL = patched.url
-                    contentCRC = patched.crc
-                } catch {
-                    throw LaunchError.patchFailed(name: patch.deletingPathExtension().lastPathComponent,
-                                                  reason: error.localizedDescription)
-                }
-                try checkCurrent(generation)
-            }
-            let patchFolder = patch.map(PatchStore.saveFolderName(for:))
-
-            let saveDirectory = AppPaths.saves.appending(path: system.id, directoryHint: .isDirectory)
-            try? FileManager.default.createDirectory(at: saveDirectory, withIntermediateDirectories: true)
-            core.systemDirectory = AppPaths.system.path(percentEncoded: false)
-            core.saveDirectory = saveDirectory.path(percentEncoded: false)
-            var batterySave = batterySaveURL(for: game, systemID: system.id, context: context)
-            if let patchFolder {
-                // A hack must not write over the original's save.
-                batterySave = batterySave.deletingLastPathComponent().appending(path: "Patches", directoryHint: .isDirectory)
-                    .appending(path: patchFolder, directoryHint: .isDirectory).appending(path: batterySave.lastPathComponent)
-            }
-            core.saveRAMPath = batterySave.path(percentEncoded: false)
-            core.rtcPath = BatterySave.rtcURL(forSave: batterySave).path(percentEncoded: false)
-            core.saveErrorHandler = { [weak self] reason in
-                MainActor.assumeIsolated {
-                    self?.showToast(String(localized: "The battery save couldn't be written. \(reason)"), kind: .warning, duration: 6)
-                }
-            }
-            let gameOptions = game.coreOptions(for: definition.id)
-            usesGameCoreOptions = gameOptions != nil
-            // The renderer's option defaults (e.g. paraLLEl-RDP for Vulkan)
-            // come first: the user's own choices, for the core or the game, win.
-            let rendererChoice = Preferences.rendererChoice(for: definition.id)
-            let renderer = definition.renderer(for: rendererChoice, vulkanAvailable: LibretroCore.vulkanAvailable)
-            core.preferredGraphicsAPI = renderer.graphicsAPI
-            core.optionOverrides = definition.optionDefaults(for: renderer)
-                .merging(Preferences.coreOptions(for: definition.id)) { $1 }
-                .merging(gameOptions ?? [:]) { $1 }
-            core.languageCode = Locale.current.language.languageCode?.identifier ?? "en"
-            core.messageHandler = { [weak self] message, duration in
-                MainActor.assumeIsolated { self?.showToast(message, duration: duration) }
-            }
-
-            let stateContext = SaveStateContext(coreID: definition.id, coreVersion: core.libraryVersion,
-                                                gameCRC32: contentCRC, gameFileName: game.fileName, gameFileSize: game.fileSize)
-            let stateFolder = patchFolder.map { "\(definition.id)/Patches/\($0)" } ?? definition.id
-            let autosaveDirectory = SaveStateStore.directory(in: AppPaths.states, gameID: game.id, coreID: stateFolder)
-            let consoleID = AchievementService.consoleID(for: system.id)
-            // Hardcore forbids continuing from a state; the game starts fresh.
-            let expectsHardcore = achievements.isActive && Preferences.achievementsHardcore && consoleID != nil
-            core.turboPeriod = Preferences.turboRate
-            core.rumbleHandler = { [weak self] port, strong, strength in
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated { self?.input.setRumble(port: port, strong: strong, strength: strength) }
-                }
-            }
-
-            let runner = EmulationRunner(core: core)
-            runner.volume = Float(Preferences.volume)
-            applyPlaybackSettings(to: runner, hardcore: expectsHardcore)
-            let writeAutosave: (@Sendable (LibretroCore) -> Void)? = Preferences.autosaveOnQuit
-                ? { @Sendable core in Self.writeAutosave(of: core, context: stateContext, in: autosaveDirectory) }
-                : nil
-            let resumeState = expectsHardcore ? nil : state
-                ?? (resume ? SaveStateStore.autosave(in: AppPaths.states, gameID: game.id, coreID: stateFolder) : nil)
-            if expectsHardcore, state != nil || resume, SaveStateStore.autosave(in: AppPaths.states, gameID: game.id, coreID: stateFolder) != nil {
+            let content = try await prepareContent(for: game, system: system, core: core, generation: generation)
+            let launch = CoreLaunch(game: game, system: system, definition: definition, core: core, content: content,
+                                    hardcore: achievements.isActive && Preferences.achievementsHardcore)
+            configure(core, for: launch, context: context)
+            let resumeState = launch.hardcore ? nil : state ?? (resume ? launch.existingAutosave : nil)
+            if launch.hardcore, state != nil || resume, launch.existingAutosave != nil {
                 showToast(String(localized: "Hardcore mode starts games from the beginning."), duration: 4)
             }
-            if resumeState == nil { runner.willUnloadHandler = writeAutosave }
-            runner.terminationHandler = { [weak self] in
-                MainActor.assumeIsolated { self?.handleUnexpectedTermination() }
-            }
-            runner.rewindStoppedHandler = { [weak self] in
-                MainActor.assumeIsolated { self?.rewindStopped() }
-            }
+
+            let runner = makeRunner(for: core, hardcore: launch.hardcore,
+                                    writeAutosave: resumeState == nil ? launch.writeAutosave : nil)
             // Register the runner before the (slow, blocking) game load starts,
             // so a launch or stop that arrives meanwhile waits for it to finish.
             self.runner = runner
-            let path = contentURL.path(percentEncoded: false)
             let error: Error? = await withCheckedContinuation { continuation in
-                runner.start(withGamePath: path) { error in continuation.resume(returning: error) }
+                runner.start(withGamePath: launch.path) { error in continuation.resume(returning: error) }
             }
             // Stopped or replaced while the game was loading: whoever
             // superseded this launch is shutting the runner down.
@@ -409,68 +363,164 @@ final class EmulationSession {
                 self.runner = nil
                 throw error
             }
-
-            self.core = core
-            self.renderer = definition.supportsVulkan ? renderer : nil
-            graphicsAPI = core.graphicsAPI
-            self.stateContext = stateContext.rendering(with: StateRenderer(core.graphicsAPI))
-            if definition.wantedRenderer(for: rendererChoice) != renderer, !Self.didReportMissingVulkan {
-                Self.didReportMissingVulkan = true
-                showToast(String(localized: "Vulkan isn’t available on this Mac, so \(definition.name) uses OpenGL."),
-                          kind: .warning, duration: 5)
-            }
-            cores.recordVersion(core.libraryVersion, for: definition)
-            self.stateFolder = stateFolder
-            patchName = patch?.deletingPathExtension().lastPathComponent
-            hasComputerKeyboard = system.kind == .computer
-            isHardcore = expectsHardcore
-            supportsCheats = core.supportsCheats
-            cheats = CheatStore.cheats(in: AppPaths.extras, gameID: game.id)
-            applyCheats()
-            autosave = resumeState == nil ? writeAutosave : nil
-            input.core = core
-            input.isTurboActive = true
-            input.profile = InputProfile.resolved(gameProfile: game.inputProfileData, systemID: system.id)
-            startedAt = .now
-            phase = .running
-            game.lastPlayed = .now
-            game.playCount += 1
-            try? context.save()
-            reloadSlots()
-            discLabels = game.fileURL.pathExtension.lowercased() == "m3u"
-                ? (DiscPlaylist.read(game.fileURL)?.entries.map(\.label) ?? []) : []
-            refreshDiskInfo()
-            startFPSTimer()
-            applyPause()
-            if let resumeState { continueFromAutosave(resumeState, then: writeAutosave) }
-            if achievements.isActive, let consoleID {
-                loadAchievements(path: path, consoleID: consoleID, core: core, runner: runner, hardcore: expectsHardcore)
-            }
-            #if DEBUG
-            if ProcessInfo.processInfo.environment["URSPRUNG_DEBUG_PLAY"] != nil {
-                // Development aid: screenshot, rewind and fast forward, then quit.
-                Task {
-                    try? await Task.sleep(for: .seconds(5)); takeScreenshot()
-                    try? await Task.sleep(for: .seconds(1)); setRewinding(true)
-                    try? await Task.sleep(for: .seconds(2)); setRewinding(false)
-                    try? await Task.sleep(for: .seconds(1)); setFastForward(true)
-                    try? await Task.sleep(for: .seconds(2)); setFastForward(false)
-                    try? await Task.sleep(for: .seconds(2)); NSApp.terminate(nil)
-                }
-            }
-            if ProcessInfo.processInfo.environment["URSPRUNG_DEBUG_STATES"] != nil {
-                // Development aid: exercise save, load and termination automatically.
-                Task {
-                    try? await Task.sleep(for: .seconds(4)); saveState(slot: 1)
-                    try? await Task.sleep(for: .seconds(2)); loadState(slot: 1)
-                    try? await Task.sleep(for: .seconds(2)); NSApp.terminate(nil)
-                }
-            }
-            #endif
+            didLoad(launch, runner: runner, resumeState: resumeState, context: context)
         } catch {
             guard generation == self.generation, !(error is CancellationError) else { return }
             phase = .failed(Failure(message: error.localizedDescription, settingsTab: settingsTab))
         }
+    }
+
+    /// What a launch in a libretro core settles before the game loads.
+    private struct CoreLaunch {
+        let game: Game
+        let system: GameSystem
+        let definition: CoreDefinition
+        let core: LibretroCore
+        let content: LaunchContent
+        let rendererChoice: RendererChoice
+        /// The graphics API to ask the core for: the user's choice, unless
+        /// this Mac has no Vulkan.
+        let renderer: HardwareRenderer
+        let stateContext: SaveStateContext
+        /// Where the game's states live below its folder: the core, or the
+        /// core and patch (a patched game keeps its states apart).
+        let stateFolder: String
+        let consoleID: Int?
+        /// Hardcore restrictions apply: the game starts fresh, without a state.
+        let hardcore: Bool
+        /// Writes the automatic state; nil when automatic states are off.
+        let writeAutosave: (@Sendable (LibretroCore) -> Void)?
+
+        init(game: Game, system: GameSystem, definition: CoreDefinition, core: LibretroCore, content: LaunchContent,
+             hardcore: Bool) {
+            self.game = game
+            self.system = system
+            self.definition = definition
+            self.core = core
+            self.content = content
+            rendererChoice = Preferences.rendererChoice(for: definition.id)
+            renderer = definition.renderer(for: rendererChoice, vulkanAvailable: LibretroCore.vulkanAvailable)
+            let stateContext = SaveStateContext(coreID: definition.id, coreVersion: core.libraryVersion,
+                                                gameCRC32: content.crc32, gameFileName: game.fileName, gameFileSize: game.fileSize)
+            self.stateContext = stateContext
+            stateFolder = content.patchFolder.map { "\(definition.id)/Patches/\($0)" } ?? definition.id
+            consoleID = AchievementService.consoleID(for: system.id)
+            self.hardcore = hardcore && consoleID != nil
+            let autosaveDirectory = SaveStateStore.directory(in: AppPaths.states, gameID: game.id, coreID: stateFolder)
+            writeAutosave = Preferences.autosaveOnQuit
+                ? { @Sendable core in EmulationSession.writeAutosave(of: core, context: stateContext, in: autosaveDirectory) }
+                : nil
+        }
+
+        var path: String { content.url.path(percentEncoded: false) }
+
+        var existingAutosave: SaveStateSlot? {
+            SaveStateStore.autosave(in: AppPaths.states, gameID: game.id, coreID: stateFolder)
+        }
+    }
+
+    /// The game loaded: the session takes over the core and runs it.
+    /// `resumeState` is loaded right away; the automatic state is written
+    /// only once that has settled.
+    private func didLoad(_ launch: CoreLaunch, runner: EmulationRunner, resumeState: SaveStateSlot?, context: ModelContext) {
+        let core = launch.core, definition = launch.definition, game = launch.game
+        self.core = core
+        renderer = definition.supportsVulkan ? launch.renderer : nil
+        graphicsAPI = core.graphicsAPI
+        stateContext = launch.stateContext.rendering(with: StateRenderer(core.graphicsAPI))
+        if definition.wantedRenderer(for: launch.rendererChoice) != launch.renderer, !Self.didReportMissingVulkan {
+            Self.didReportMissingVulkan = true
+            showToast(String(localized: "Vulkan isn’t available on this Mac, so \(definition.name) uses OpenGL."),
+                      kind: .warning, duration: 5)
+        }
+        cores.recordVersion(core.libraryVersion, for: definition)
+        stateFolder = launch.stateFolder
+        patchName = launch.content.patchName
+        hasComputerKeyboard = launch.system.kind == .computer
+        isHardcore = launch.hardcore
+        supportsCheats = core.supportsCheats
+        cheats = CheatStore.cheats(in: AppPaths.extras, gameID: game.id)
+        applyCheats()
+        autosave = resumeState == nil ? launch.writeAutosave : nil
+        input.core = core
+        input.isTurboActive = true
+        input.profile = InputProfile.resolved(gameProfile: game.inputProfileData, systemID: launch.system.id)
+        startedAt = .now
+        phase = .running
+        game.lastPlayed = .now
+        game.playCount += 1
+        try? context.save()
+        reloadSlots()
+        discLabels = game.fileURL.pathExtension.lowercased() == "m3u"
+            ? (DiscPlaylist.read(game.fileURL)?.entries.map(\.label) ?? []) : []
+        refreshDiskInfo()
+        startFPSTimer()
+        applyPause()
+        if let resumeState { continueFromAutosave(resumeState, then: launch.writeAutosave) }
+        if achievements.isActive, let consoleID = launch.consoleID {
+            loadAchievements(path: launch.path, consoleID: consoleID, core: core, runner: runner, hardcore: launch.hardcore)
+        }
+        #if DEBUG
+        runDebugExercises()
+        #endif
+    }
+
+    /// Hands the core its folders and save files, its options and the
+    /// graphics API to ask for, and the callbacks it reports through.
+    private func configure(_ core: LibretroCore, for launch: CoreLaunch, context: ModelContext) {
+        let game = launch.game, system = launch.system, definition = launch.definition, renderer = launch.renderer
+        let saveDirectory = AppPaths.saves.appending(path: system.id, directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: saveDirectory, withIntermediateDirectories: true)
+        core.systemDirectory = AppPaths.system.path(percentEncoded: false)
+        core.saveDirectory = saveDirectory.path(percentEncoded: false)
+        var batterySave = batterySaveURL(for: game, systemID: system.id, context: context)
+        if let patchFolder = launch.content.patchFolder {
+            // A hack must not write over the original's save.
+            batterySave = batterySave.deletingLastPathComponent().appending(path: "Patches", directoryHint: .isDirectory)
+                .appending(path: patchFolder, directoryHint: .isDirectory).appending(path: batterySave.lastPathComponent)
+        }
+        core.saveRAMPath = batterySave.path(percentEncoded: false)
+        core.rtcPath = BatterySave.rtcURL(forSave: batterySave).path(percentEncoded: false)
+        core.saveErrorHandler = { [weak self] reason in
+            MainActor.assumeIsolated {
+                self?.showToast(String(localized: "The battery save couldn't be written. \(reason)"), kind: .warning, duration: 6)
+            }
+        }
+        let gameOptions = game.coreOptions(for: definition.id)
+        usesGameCoreOptions = gameOptions != nil
+        // The renderer's option defaults (e.g. paraLLEl-RDP for Vulkan)
+        // come first: the user's own choices, for the core or the game, win.
+        core.preferredGraphicsAPI = renderer.graphicsAPI
+        core.optionOverrides = definition.optionDefaults(for: renderer)
+            .merging(Preferences.coreOptions(for: definition.id)) { $1 }
+            .merging(gameOptions ?? [:]) { $1 }
+        core.languageCode = Locale.current.language.languageCode?.identifier ?? "en"
+        core.messageHandler = { [weak self] message, duration in
+            MainActor.assumeIsolated { self?.showToast(message, duration: duration) }
+        }
+        core.turboPeriod = Preferences.turboRate
+        core.rumbleHandler = { [weak self] port, strong, strength in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.input.setRumble(port: port, strong: strong, strength: strength) }
+            }
+        }
+    }
+
+    /// The emulation thread for `core`, with the playback settings and the
+    /// handlers it reports through. `writeAutosave` runs as the game unloads.
+    private func makeRunner(for core: LibretroCore, hardcore: Bool,
+                            writeAutosave: (@Sendable (LibretroCore) -> Void)?) -> EmulationRunner {
+        let runner = EmulationRunner(core: core)
+        runner.volume = Float(Preferences.volume)
+        applyPlaybackSettings(to: runner, hardcore: hardcore)
+        runner.willUnloadHandler = writeAutosave
+        runner.terminationHandler = { [weak self] in
+            MainActor.assumeIsolated { self?.handleUnexpectedTermination() }
+        }
+        runner.rewindStoppedHandler = { [weak self] in
+            MainActor.assumeIsolated { self?.rewindStopped() }
+        }
+        return runner
     }
 
     /// Battery saves are kept per game. A save that older versions stored under
@@ -493,9 +543,41 @@ final class EmulationSession {
         if generation != self.generation { throw CancellationError() }
     }
 
-    /// Resolves the file handed to the core, extracting zipped cartridges if
-    /// the core cannot read archives itself.
-    private func prepareContent(for game: Game, system: GameSystem, core: LibretroCore) async throws -> URL {
+    /// The file a core loads: the game, unpacked or patched as needed.
+    private struct LaunchContent {
+        let url: URL
+        let crc32: String?
+        /// The active ROM patch.
+        let patch: URL?
+
+        /// Where a patched game keeps its saves and states apart.
+        var patchFolder: String? { patch.map(PatchStore.saveFolderName(for:)) }
+        var patchName: String? { patch?.deletingPathExtension().lastPathComponent }
+    }
+
+    /// Resolves the file handed to the core: extracts zipped cartridges if
+    /// the core cannot read archives itself, and applies the game's patch.
+    private func prepareContent(for game: Game, system: GameSystem, core: LibretroCore,
+                                generation: Int) async throws -> LaunchContent {
+        let url = try await unpackedContent(for: game, system: system, core: core)
+        try checkCurrent(generation)
+        guard system.supportsPatches, let patch = PatchStore.active(in: AppPaths.extras, gameID: game.id) else {
+            return LaunchContent(url: url, crc32: game.crc32, patch: nil)
+        }
+        let patched: (url: URL, crc: String)
+        do {
+            patched = try await Self.patch(url, with: patch, into: AppPaths.extracted.appending(path: "\(game.id.uuidString)-patched"))
+        } catch {
+            throw LaunchError.patchFailed(name: patch.deletingPathExtension().lastPathComponent,
+                                          reason: error.localizedDescription)
+        }
+        try checkCurrent(generation)
+        return LaunchContent(url: patched.url, crc32: patched.crc, patch: patch)
+    }
+
+    /// The game's file, or its cartridge extracted from a zip archive the
+    /// core cannot read itself.
+    private func unpackedContent(for game: Game, system: GameSystem, core: LibretroCore) async throws -> URL {
         let url = game.fileURL
         guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else {
             throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: url.path(percentEncoded: false)])
@@ -539,16 +621,17 @@ final class EmulationSession {
             settingsTab = nil
 
             // Its own window would write the settings this launch writes.
-            await closeStandaloneSettings()
+            await standaloneSettings.close()
             try checkCurrent(generation)
 
             let stateFolder = SaveStateStore.directory(in: AppPaths.states, gameID: game.id, coreID: emulator.id)
             let logFolder = emulators.logFolder(for: emulator)
-            let request = armsx2Request(app: app, emulator: emulator, system: system, game: game, resume: resume, state: state)
+            let request = ARMSX2Launch.Request(app: app, emulator: emulator, system: system, game: game, resume: resume,
+                                               state: state, emulators: emulators, bios: bios)
             let launch: ARMSX2Launch
             let external: ExternalSession
             do {
-                launch = try await Self.prepare(request)
+                launch = try await ARMSX2Launch.prepareInBackground(request)
                 try checkCurrent(generation)
                 // From here to the start nothing suspends, so no other launch
                 // can write the shared settings or log in between.
@@ -561,43 +644,21 @@ final class EmulationSession {
                 throw error
             }
             external.onExit = { [weak self] exit in self?.externalDidExit(exit) }
-            self.external = external
-            externalStateFolder = stateFolder
-            externalLog = launch.logFile
-            externalSaveStateVersion = launch.saveStateVersion
+            let pine = PINEClient(socket: launch.pineSocket)
+            externalRun = ExternalRun(process: external, stateFolder: stateFolder, log: launch.logFile,
+                                      saveStateVersion: launch.saveStateVersion, pine: pine, control: .connecting)
             self.stateFolder = emulator.id
             startedAt = .now
             phase = .external
             reloadSlots()
             // Saves made in the emulator's window, and saves that land late.
             stateWatcher.watch([stateFolder])
-            let pine = PINEClient(socket: launch.pineSocket)
-            self.pine = pine
-            externalControl = .connecting
-            pineTask = Task { [weak self] in await self?.watchPINE(pine, generation: generation) }
+            externalRun?.pineTask = Task { [weak self] in await self?.watchPINE(pine, generation: generation) }
             game.lastPlayed = .now
             game.playCount += 1
             try? context.save()
             #if DEBUG
-            if ProcessInfo.processInfo.environment["URSPRUNG_DEBUG_PLAY"] != nil {
-                // Development aid: quit the emulator like the Quit button, then Ursprung.
-                Task {
-                    try? await Task.sleep(for: .seconds(20)); await stop(context: nil)
-                    try? await Task.sleep(for: .seconds(2)); NSApp.terminate(nil)
-                }
-            }
-            if ProcessInfo.processInfo.environment["URSPRUNG_DEBUG_STATES"] != nil {
-                // Development aid: once the game shows, save and load through PINE, then quit.
-                Task {
-                    while externalControl == .connecting || (externalControl == .ready && !externalHasStarted) {
-                        try? await Task.sleep(for: .milliseconds(500))
-                    }
-                    try? await Task.sleep(for: .seconds(4)); saveState(slot: 1)
-                    try? await Task.sleep(for: .seconds(4)); loadState(slot: 1)
-                    try? await Task.sleep(for: .seconds(4)); await stop(context: nil)
-                    try? await Task.sleep(for: .seconds(2)); NSApp.terminate(nil)
-                }
-            }
+            runStandaloneDebugExercises()
             #endif
         } catch {
             guard generation == self.generation, !(error is CancellationError) else { return }
@@ -605,98 +666,24 @@ final class EmulationSession {
         }
     }
 
-    /// What ARMSX2 is started with: `game` in Ursprung's folders for it, or
-    /// without a game ARMSX2's own window and folders.
-    private func armsx2Request(app: URL, emulator: StandaloneEmulator, system: GameSystem, game: Game?,
-                               resume: Bool = false, state: URL? = nil) -> ARMSX2Launch.Request {
-        // The metadata region, when the disc does not tell which BIOS it wants.
-        let fallbackRegion: PS2BIOS.Region = switch Preferences.scraperRegion {
-        case "us": .usa
-        case "jp": .japan
-        default: .europe
-        }
-        let dataFolder = emulators.dataFolder(for: emulator)
-        return ARMSX2Launch.Request(
-            app: app, executable: emulator.executable,
-            dataFolder: dataFolder,
-            logFile: emulators.logFolder(for: emulator).appending(path: "last-run.log"),
-            pineFolder: ARMSX2Launch.newPINEFolder(in: URL(filePath: NSTemporaryDirectory())),
-            game: game?.fileURL,
-            biosFolder: AppPaths.system.appending(path: system.biosFolder?.path ?? "", directoryHint: .isDirectory),
-            dumps: system.biosFolder.map(bios.dumps(in:)) ?? [],
-            fallbackRegion: fallbackRegion,
-            memoryCardFolder: game.map { PS2MemoryCard.folder(in: AppPaths.saves, systemID: system.id, gameID: $0.id) }
-                ?? PCSX2Config.ownFolder("memcards", dataFolder: dataFolder),
-            saveStateFolder: game.map { SaveStateStore.directory(in: AppPaths.states, gameID: $0.id, coreID: emulator.id) }
-                ?? PCSX2Config.ownFolder("sstates", dataFolder: dataFolder),
-            snapshotFolder: game.map { ScreenshotStore.directory(in: AppPaths.extras, gameID: $0.id) }
-                ?? PCSX2Config.ownFolder("snaps", dataFolder: dataFolder),
-            resume: resume,
-            saveStateOnShutdown: Preferences.autosaveOnQuit,
-            fullscreen: Preferences.standaloneFullscreen,
-            controls: ARMSX2Controls(
-                profile: InputProfile.resolved(gameProfile: game?.inputProfileData, systemID: system.id),
-                hotkeys: .current, rumble: Preferences.rumble, deadZone: Preferences.stickDeadZone,
-                keyNames: ARMSX2Keys.currentLayout()),
-            saveStateVersion: emulators.saveStateVersion(of: emulator),
-            stateFile: state)
-    }
-
     // MARK: - A standalone emulator's own settings
 
-    /// Opens the emulator's own window on Ursprung's data folder, for the
-    /// settings Ursprung does not manage (graphics, achievements; Q5). The
-    /// settings Ursprung manages are written first and again before every
-    /// game. Brings an open one to the front.
-    func openStandaloneSettings(_ emulator: StandaloneEmulator) async throws {
-        if let standaloneSettings, standaloneSettings.isRunning {
-            return standaloneSettings.activate()
-        }
-        guard !isStandaloneEmulatorInUse, standaloneSettingsOpening == nil, let system = SystemCatalog.all.first(where: {
-            $0.cores.contains { $0.standalone?.id == emulator.id }
-        }) else { return }
-        standaloneSettingsID = emulator.id
-        let opening = Task { try await startStandaloneSettings(emulator, system: system) }
-        standaloneSettingsOpening = opening
-        defer { standaloneSettingsOpening = nil }
-        do {
-            try await opening.value
-        } catch {
-            standaloneSettingsID = nil
-            throw error
-        }
-    }
+    /// The emulator whose own window is open or opening.
+    var standaloneSettingsID: String? { standaloneSettings.emulatorID }
 
-    private func startStandaloneSettings(_ emulator: StandaloneEmulator, system: GameSystem) async throws {
-        let app = try await emulators.ensureInstalled(emulator)
-        await bios.refresh()
-        let request = armsx2Request(app: app, emulator: emulator, system: system, game: nil)
-        let launch: ARMSX2Launch
-        let process: ExternalSession
-        do {
-            launch = try await Self.prepare(request)
-            // A game launch waits for this, then writes its own settings.
-            guard !isStandaloneEmulatorInUse else {
-                try? FileManager.default.removeItem(at: request.pineFolder)
-                standaloneSettingsID = nil
-                return
-            }
-            try launch.writeSharedFiles()
-            process = try ExternalSession(executable: launch.executable, arguments: launch.arguments,
-                                          environment: launch.environment,
-                                          output: emulators.logFolder(for: emulator).appending(path: "last-run-output.log"))
-        } catch {
-            try? FileManager.default.removeItem(at: request.pineFolder)
-            throw error
+    /// Opens the emulator's own window on Ursprung's data folder, for the
+    /// settings Ursprung does not manage. Brings an open one to the front.
+    func openStandaloneSettings(_ emulator: StandaloneEmulator) async throws {
+        guard let system = SystemCatalog.all.first(where: { $0.cores.contains { $0.standalone?.id == emulator.id } }) else {
+            return
         }
-        let pine = PINEClient(socket: launch.pineSocket)
-        process.onExit = { [weak self, weak process] _ in
-            Self.removePINEFolder(of: pine)
-            guard let self, self.standaloneSettings === process else { return }
-            self.standaloneSettings = nil
-            self.standaloneSettingsID = nil
+        try await standaloneSettings.open(emulator,
+                                          outputLog: emulators.logFolder(for: emulator).appending(path: "last-run-output.log"),
+                                          isEmulatorInUse: { [weak self] in self?.isStandaloneEmulatorInUse ?? false }) { [self] in
+            let app = try await emulators.ensureInstalled(emulator)
+            await bios.refresh()
+            return ARMSX2Launch.Request(app: app, emulator: emulator, system: system, game: nil, emulators: emulators, bios: bios)
         }
-        standaloneSettings = process
     }
 
     /// A game is starting or running in a standalone emulator.
@@ -709,14 +696,14 @@ final class EmulationSession {
     /// its settings are in use. The next game's backend does not matter
     /// while the previous emulator quits.
     var isStandaloneEmulatorInUse: Bool {
-        external != nil || isStandaloneGameActive
+        externalRun != nil || isStandaloneGameActive
     }
 
     /// Whether a standalone emulator may write into the states of the game
     /// `id` right now: it is starting the game, runs it, or still quits
     /// (a quit waits for a save under way, then writes the resume state).
     func standaloneMayWriteStates(of id: UUID) -> Bool {
-        if external != nil, gameUUID == id { return true }
+        if externalRun != nil, gameUUID == id { return true }
         return isStandaloneGameActive && requestedGameUUID == id
     }
 
@@ -724,48 +711,27 @@ final class EmulationSession {
     /// Tests: `process` runs the game `id` in its standalone emulator, as
     /// after a launch, without PINE.
     func adoptExternalForTesting(_ process: ExternalSession, gameID id: UUID) {
-        external = process
+        externalRun = ExternalRun(process: process)
         gameUUID = id
         requestedGameUUID = id
         phase = .external
     }
     #endif
 
-    /// Quits the emulator's own window, which saves its settings as it goes.
-    /// One that is still opening is waited for: it writes the settings too.
-    private func closeStandaloneSettings() async {
-        _ = try? await standaloneSettingsOpening?.value
-        guard let standaloneSettings else { return }
-        await standaloneSettings.stop()
-        if self.standaloneSettings === standaloneSettings {
-            self.standaloneSettings = nil
-            standaloneSettingsID = nil
-        }
-    }
-
-    private static func removePINEFolder(of client: PINEClient) {
-        try? FileManager.default.removeItem(at: client.socket.deletingLastPathComponent())
-    }
-
-    @concurrent
-    private static func prepare(_ request: ARMSX2Launch.Request) async throws -> ARMSX2Launch {
-        try ARMSX2Launch.prepare(request, environment: ProcessInfo.processInfo.environment)
-    }
-
     /// Connects to the emulator's PINE socket, then watches for the game's
     /// first frame: a crash before it means the game could not be started.
     private func watchPINE(_ client: PINEClient, generation: Int) async {
         let isReady = (try? await client.waitUntilReady(timeout: .seconds(30))) != nil
         guard generation == self.generation, phase == .external else { return }
-        externalControl = isReady ? .ready : .unavailable
+        externalRun?.control = isReady ? .ready : .unavailable
         guard isReady else { return }
-        while !Task.isCancelled, !externalHasStarted {
+        while !Task.isCancelled, externalRun?.hasStarted == false {
             if let stats = try? await client.stats() {
-                externalHasStarted = stats.frameNumber > 0
+                externalRun?.hasStarted = stats.frameNumber > 0
             } else if (try? await client.status()) == .running {
-                externalHasStarted = true
+                externalRun?.hasStarted = true
             }
-            if !externalHasStarted { try? await Task.sleep(for: .milliseconds(500)) }
+            if externalRun?.hasStarted == false { try? await Task.sleep(for: .milliseconds(500)) }
         }
     }
 
@@ -773,10 +739,10 @@ final class EmulationSession {
     private func externalDidExit(_ exit: ExternalSession.Exit) {
         // A stop or another launch is finishing the session.
         guard shutdown == nil, !exit.wasRequested else { return }
-        let log = externalLog
+        let log = externalRun?.log
         let name = coreName
         // Without PINE there is no telling; a crash then counts as a stop.
-        let hasStarted = externalHasStarted || externalControl == .unavailable
+        let hasStarted = hasExternalGameStarted || externalControl == .unavailable
         finishExternal(cleanExit: exit.isClean, context: nil)
         guard !exit.isClean else {
             phase = .idle
@@ -792,23 +758,16 @@ final class EmulationSession {
     /// write. After a crash the old one is the best there is, so it stays.
     private func finishExternal(cleanExit: Bool, context: ModelContext?) {
         recordPlayTime(context: context)
-        if cleanExit, let folder = externalStateFolder, let startedAt {
+        if cleanExit, let folder = externalRun?.stateFolder, let startedAt {
             ARMSX2States.removeStaleResumeState(in: folder, olderThan: startedAt)
         }
-        pineTask?.cancel()
-        pineTask = nil
+        if let run = externalRun {
+            run.pineTask?.cancel()
+            run.stateTask?.cancel()
+            run.pine?.removeSocketFolder()
+        }
+        externalRun = nil
         stateWatcher.stop()
-        externalStateTask?.cancel()
-        externalStateTask = nil
-        if let pine { Self.removePINEFolder(of: pine) }
-        pine = nil
-        externalControl = nil
-        isExternalStateBusy = false
-        externalHasStarted = false
-        externalSaveStateVersion = nil
-        external = nil
-        externalStateFolder = nil
-        externalLog = nil
         stateFolder = nil
         startedAt = nil
         reloadSlots()
@@ -816,7 +775,7 @@ final class EmulationSession {
 
     /// Brings the standalone emulator's window to the front.
     func showExternalWindow() {
-        external?.activate()
+        externalRun?.process.activate()
     }
 
     /// Closes a failure shown in the library instead of the player window.
@@ -838,10 +797,10 @@ final class EmulationSession {
     /// runner is stopped once and a new game waits until the old one is gone.
     private func shutDownRunner(context: ModelContext?) async {
         if let shutdown { return await shutdown.value }
-        if let external {
+        if let external = externalRun?.process {
             let task = Task {
                 // A save being written finishes first, in this emulator.
-                await externalStateTask?.value
+                await externalRun?.stateTask?.value
                 let exit = await external.stop()
                 finishExternal(cleanExit: exit.isClean, context: context)
                 shutdown = nil
@@ -1160,8 +1119,7 @@ final class EmulationSession {
     /// With URSPRUNG_SNAPSHOT_DIR set, the current frame and session state are
     /// written there once per second (Metal layers cannot be snapshotted).
     private func writeDebugSnapshot() {
-        guard let path = ProcessInfo.processInfo.environment["URSPRUNG_SNAPSHOT_DIR"], let core else { return }
-        let directory = URL(filePath: path, directoryHint: .isDirectory)
+        guard let directory = DebugEnvironment.snapshotDirectory, let core else { return }
         if let image = core.copyFrameImage() { Self.writePNG(image, to: directory.appending(path: "frame.png")) }
         let state = "phase=\(phase) paused=\(isPaused) fps=\(measuredFPS) core=\(coreName) size=\(core.baseWidth)x\(core.baseHeight) aspect=\(core.aspectRatio) hw=\(core.usesHardwareRendering)"
             + " graphics=\(StateRenderer(graphicsAPI).rawValue)"
@@ -1264,7 +1222,7 @@ final class EmulationSession {
             history = []
             return
         }
-        if let externalStateFolder {
+        if let externalStateFolder = externalRun?.stateFolder {
             let states = ARMSX2States.states(in: externalStateFolder)
             slots = [states.autosave].compactMap { $0 } + states.slots
         } else {
@@ -1343,14 +1301,14 @@ final class EmulationSession {
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     if success {
-                        if let note = issues.first.map(Self.loadedNote) {
+                        if let note = issues.first.map(\.loadedNote) {
                             self.showToast(note, kind: .warning, duration: 5)
                         } else {
                             self.showToast(String(localized: "State loaded"), kind: .loaded)
                         }
                         self.isMenuVisible = false
                     } else {
-                        let reason = issues.first.map(Self.failureReason) ?? ""
+                        let reason = issues.first.map(\.failureReason) ?? ""
                         self.showToast([String(localized: "The state could not be loaded."), reason].joined(separator: " ")
                             .trimmingCharacters(in: .whitespaces), kind: .warning, duration: 6)
                     }
@@ -1377,15 +1335,14 @@ final class EmulationSession {
     }
 
     private func saveExternalState(slot: Int) {
-        guard let pine, let folder = externalStateFolder else { return }
-        guard externalControl == .ready else {
+        guard let run = externalRun, let pine = run.pine, let folder = run.stateFolder else { return }
+        guard run.control == .ready else {
             return showToast(externalStatesNote ?? "", kind: .warning, duration: 5)
         }
         // A quitting emulator saves its resume state; nothing new goes out.
-        guard !isExternalStateBusy, shutdown == nil else { return }
-        isExternalStateBusy = true
-        let session = external
-        externalStateTask = Task {
+        guard run.stateTask == nil, shutdown == nil else { return }
+        let session = run.process
+        externalRun?.stateTask = Task {
             var failure: (any Error)?
             do {
                 _ = try await ARMSX2States.save(slot: slot, through: pine, in: folder)
@@ -1393,45 +1350,42 @@ final class EmulationSession {
                 failure = error
             }
             // The session ended meanwhile: the next one has its own state.
-            guard self.external === session else { return }
+            guard externalRun?.process === session else { return }
             if let failure {
                 showToast(failure.localizedDescription, kind: .warning, duration: 5)
             } else {
                 showToast(String(localized: "State saved"), kind: .saved)
             }
-            isExternalStateBusy = false
-            externalStateTask = nil
+            externalRun?.stateTask = nil
             reloadSlots()
         }
     }
 
     /// Loads a state in the emulator's window and brings that window forward.
     private func loadExternalState(slot: Int, expected: URL? = nil) {
-        guard let pine, let folder = externalStateFolder else { return }
-        guard externalControl == .ready else {
+        guard let run = externalRun, let pine = run.pine, let folder = run.stateFolder else { return }
+        guard run.control == .ready else {
             return showToast(externalStatesNote ?? "", kind: .warning, duration: 5)
         }
         // A quitting emulator saves its resume state; nothing new goes out.
-        guard !isExternalStateBusy, shutdown == nil else { return }
-        isExternalStateBusy = true
-        let version = externalSaveStateVersion
-        let session = external
-        externalStateTask = Task {
+        guard run.stateTask == nil, shutdown == nil else { return }
+        let version = run.saveStateVersion
+        let session = run.process
+        externalRun?.stateTask = Task {
             var failure: (any Error)?
             do {
                 try await ARMSX2States.load(slot: slot, in: folder, expected: expected, through: pine, saveStateVersion: version)
             } catch {
                 failure = error
             }
-            guard self.external === session else { return }
+            guard externalRun?.process === session else { return }
             if let failure {
                 showToast(failure.localizedDescription, kind: .warning, duration: 5)
             } else {
                 showToast(String(localized: "State loaded"), kind: .loaded)
-                external?.activate()
+                session.activate()
             }
-            isExternalStateBusy = false
-            externalStateTask = nil
+            externalRun?.stateTask = nil
         }
     }
 
@@ -1467,29 +1421,6 @@ final class EmulationSession {
             showToast(String(localized: "The state couldn't be restored. \(error.localizedDescription)"), kind: .warning, duration: 5)
         }
         reloadSlots()
-    }
-
-    /// A short description of an issue, e.g. for a slot's help text.
-    static func describe(_ issue: SaveStateIssue) -> String {
-        switch issue {
-        case .unknownOrigin: String(localized: "Saved by an earlier version of Ursprung, possibly with another core.")
-        case .coreVersion(let version): String(localized: "Saved with core version \(version).")
-        case .differentGameFile: String(localized: "Saved from a different version of the game file.")
-        case .renderer(let renderer): String(localized: "Saved while the game rendered with \(renderer.displayName).")
-        }
-    }
-
-    private static func loadedNote(_ issue: SaveStateIssue) -> String {
-        String(localized: "State loaded. \(describe(issue)) If the game misbehaves, restart it.")
-    }
-
-    private static func failureReason(_ issue: SaveStateIssue) -> String {
-        switch issue {
-        case .unknownOrigin: String(localized: "It was probably made with another core.")
-        case .coreVersion(let version): String(localized: "It was saved with core version \(version); the installed version can't read it.")
-        case .differentGameFile: String(localized: "It was saved from a different version of the game file.")
-        case .renderer(let renderer): String(localized: "It was saved while the game rendered with \(renderer.displayName). Switch back in Settings → Cores to load it.")
-        }
     }
 
     nonisolated private static func writePNG(_ image: CGImage, to url: URL) {
