@@ -3,85 +3,6 @@
 import SwiftData
 import SwiftUI
 
-nonisolated enum LibrarySelection: Hashable {
-    case all, favorites, recent, hidden
-    case system(String)
-    case collection(String)
-}
-
-/// What the content column shows. See docs/DESIGN_SPEC.md, section H.
-nonisolated enum LibraryState: Equatable {
-    case welcome
-    /// The first scan is running and no game is known yet.
-    case scanning
-    case noGames
-    /// The library is the empty folder structure: games still need to be copied in.
-    case awaitingGames
-    case noResults(query: String)
-    case noFilterResults
-    case noFavorites
-    case nothingPlayed
-    case emptyCollection
-    case games
-
-    init(hasFolders: Bool, isScanning: Bool, libraryCount: Int, visibleCount: Int, searchText: String,
-         selection: LibrarySelection, isFiltered: Bool = false, usesFolderStructure: Bool = false) {
-        if !hasFolders {
-            self = .welcome
-        } else if visibleCount > 0 {
-            self = .games
-        } else if libraryCount == 0 {
-            // A scan with games already known keeps the grid; progress is in the activity footer.
-            self = isScanning ? .scanning : usesFolderStructure ? .awaitingGames : .noGames
-        } else if !searchText.isEmpty {
-            self = .noResults(query: searchText)
-        } else if isFiltered {
-            self = .noFilterResults
-        } else {
-            switch selection {
-            case .favorites: self = .noFavorites
-            case .recent: self = .nothingPlayed
-            case .collection: self = .emptyCollection
-            // A system without games has no sidebar row; LibraryView falls back to All Games.
-            case .all, .system, .hidden: self = .games
-            }
-        }
-    }
-}
-
-enum LibrarySort: String, CaseIterable, Identifiable {
-    case title, recentlyAdded, recentlyPlayed, releaseYear, system, playTime
-    var id: String { rawValue }
-
-    var label: LocalizedStringKey {
-        switch self {
-        case .title: "Title"
-        case .recentlyAdded: "Recently Added"
-        case .recentlyPlayed: "Recently Played"
-        case .releaseYear: "Release Year"
-        case .system: "System"
-        case .playTime: "Play Time"
-        }
-    }
-
-    /// Dates and play time list the latest and longest first.
-    var isDescendingByDefault: Bool {
-        self == .recentlyAdded || self == .recentlyPlayed || self == .playTime
-    }
-
-    /// `games` in this order; `games` comes sorted by title, which breaks ties.
-    func sorted(_ games: [Game]) -> [Game] {
-        switch self {
-        case .title: games
-        case .recentlyAdded: games.sorted { $0.dateAdded > $1.dateAdded }
-        case .recentlyPlayed: games.sorted { ($0.lastPlayed ?? .distantPast) > ($1.lastPlayed ?? .distantPast) }
-        case .releaseYear: games.sorted { ($0.releaseDate ?? "9999") < ($1.releaseDate ?? "9999") }
-        case .system: games.sorted { ($0.system?.name ?? $0.systemID) < ($1.system?.name ?? $1.systemID) }
-        case .playTime: games.sorted { $0.playTime > $1.playTime }
-        }
-    }
-}
-
 struct LibraryView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.openWindow) private var openWindow
@@ -197,7 +118,7 @@ struct LibraryView: View {
 
     private struct ObserversModifier: ViewModifier {
         let view: LibraryView
-        let shelf: Shelf
+        let shelf: LibraryShelf
 
         func body(content: Content) -> some View {
             view.observers(content, shelf: shelf)
@@ -215,16 +136,14 @@ struct LibraryView: View {
                 Text("Play time and favorite status are lost. Saves stay on disk.")
             }
             .confirmationDialog(Text("Delete the collection “\(collectionPendingDeletion ?? "")”?"),
-                                isPresented: Binding(get: { collectionPendingDeletion != nil },
-                                                     set: { if !$0 { collectionPendingDeletion = nil } }),
+                                isPresented: $collectionPendingDeletion.isPresent(),
                                 presenting: collectionPendingDeletion) { collection in
                 Button("Delete Collection", role: .destructive) { deleteCollection(collection) }
                 Button("Cancel", role: .cancel) {}
             } message: { _ in
                 Text("The games stay in the library.")
             }
-            .alert(collectionPrompt?.title ?? "", isPresented: Binding(get: { collectionPrompt != nil },
-                                                                         set: { if !$0 { collectionPrompt = nil } }),
+            .alert(collectionPrompt?.title ?? "", isPresented: $collectionPrompt.isPresent(),
                    presenting: collectionPrompt) { prompt in
                 TextField("Name", text: $collectionName)
                 Button(prompt.confirmTitle) { commit(prompt) }
@@ -255,7 +174,7 @@ struct LibraryView: View {
                 SaveStatesBrowser(game: game) { state in play(game, from: state) }
             }
             .alert(Text(unavailableGame?.title ?? ""),
-                   isPresented: Binding(get: { unavailableGame != nil }, set: { if !$0 { unavailableGame = nil } }),
+                   isPresented: $unavailableGame.isPresent(),
                    presenting: unavailableGame) { item in
                 if item.volume == nil {
                     Button("Locate…") {
@@ -310,7 +229,7 @@ struct LibraryView: View {
                                               : Text("“\(session.gameTitle)” couldn't be started")
     }
 
-    private func observers(_ content: some View, shelf: Shelf) -> some View {
+    private func observers(_ content: some View, shelf: LibraryShelf) -> some View {
         content
             .onChange(of: library.isScanning) { _, isScanning in
                 if !isScanning, let summary = library.lastScanSummary { announce(summary) }
@@ -351,70 +270,77 @@ struct LibraryView: View {
             .task(id: librarySystems.map(\.id)) {
                 if Preferences.autoScrape { await systemMedia.fetchMissing(for: librarySystems) }
             }
-            .task {
-                // The inspector shows missing BIOS files; their status must be known.
-                await bios.refresh()
-                if !library.folders.isEmpty { await library.rescan(context: context) }
-                library.startWatching(context: context)
-                if let root = library.folderStructure {
-                    await library.updateFolderStructure()
-                    bios.watch(FolderStructure.bios(in: root))
-                }
-                // The first launch offers folders for games and BIOS files.
-                // Who has a library already is not asked.
-                if !Preferences.folderStructureOffered {
-                    if library.folders.isEmpty, games.isEmpty {
-                        isShowingFolderSetup = true
-                    } else {
-                        Preferences.folderStructureOffered = true
-                    }
-                }
-                // Files opened from the Finder before the library was ready.
-                if let request = externalOpen.requests.first {
-                    externalOpen.requests.removeFirst()
-                    importItems(request, playsSingleGame: true)
-                }
-                #if DEBUG
-                // Development aid: URSPRUNG_AUTOPLAY=<title substring> starts a game on launch.
-                if let query = ProcessInfo.processInfo.environment["URSPRUNG_AUTOPLAY"],
-                   let game = games.first(where: { $0.title.localizedStandardContains(query) || $0.fileName.localizedStandardContains(query) }) {
-                    play(game)
-                }
-                if let systemID = ProcessInfo.processInfo.environment["URSPRUNG_SYSTEM"] {
-                    selection = .system(systemID)
-                }
-                // URSPRUNG_FOLDER_SETUP=1 offers the folder structure as on the first launch.
-                if ProcessInfo.processInfo.environment["URSPRUNG_FOLDER_SETUP"] == "1" { isShowingFolderSetup = true }
-                // URSPRUNG_SELECT=<title substring>[|<title substring>…] selects one or several games.
-                if let query = ProcessInfo.processInfo.environment["URSPRUNG_SELECT"] {
-                    let ids = query.split(separator: "|").compactMap { part in
-                        games.first { $0.title.localizedStandardContains(part) }?.persistentModelID
-                    }
-                    if ids.count > 1 {
-                        gameSelection.replace(with: Set(ids), order: games.map(\.persistentModelID))
-                    } else {
-                        gameSelection.select(ids.first)
-                    }
-                }
-                // URSPRUNG_SHADER_EDITOR=<preset:library/…|preset:user/…|system id|new> opens the shader editor.
-                if let request = ProcessInfo.processInfo.environment["URSPRUNG_SHADER_EDITOR"] {
-                    if case .preset(let preset)? = ShaderSelection(rawValue: request) {
-                        shaderEditor.open(.preset(preset))
-                    } else if request == "new" {
-                        shaderEditor.open(.newPreset)
-                    } else if SystemCatalog.system(withID: request) != nil {
-                        shaderEditor.open(.system(request))
-                    }
-                    openWindow(id: WindowID.shaderEditor)
-                }
-                // Shows the activity footer's error row.
-                if let message = ProcessInfo.processInfo.environment["URSPRUNG_METADATA_ERROR"] {
-                    metadata.lastError = message == "quota" ? MetadataFailure(ScreenScraperError.quotaExceeded)
-                        : MetadataFailure(reason: message, message: message)
-                }
-                #endif
-            }
+            .task { await startUp() }
     }
+
+    /// Scans and watches the library folders when the window opens, and
+    /// offers the folder structure on the first launch.
+    private func startUp() async {
+        // The inspector shows missing BIOS files; their status must be known.
+        await bios.refresh()
+        if !library.folders.isEmpty { await library.rescan(context: context) }
+        library.startWatching(context: context)
+        if let root = library.folderStructure {
+            await library.updateFolderStructure()
+            bios.watch(FolderStructure.bios(in: root))
+        }
+        // The first launch offers folders for games and BIOS files.
+        // Who has a library already is not asked.
+        if !Preferences.folderStructureOffered {
+            if library.folders.isEmpty, games.isEmpty {
+                isShowingFolderSetup = true
+            } else {
+                Preferences.folderStructureOffered = true
+            }
+        }
+        // Files opened from the Finder before the library was ready.
+        if let request = externalOpen.requests.first {
+            externalOpen.requests.removeFirst()
+            importItems(request, playsSingleGame: true)
+        }
+        #if DEBUG
+        applyDebugEnvironment()
+        #endif
+    }
+
+    #if DEBUG
+    /// Development aids from `DebugEnvironment`: start or select games, open
+    /// the folder setup or the shader editor, show a metadata error.
+    private func applyDebugEnvironment() {
+        if let query = DebugEnvironment.autoplayQuery,
+           let game = games.first(where: { $0.title.localizedStandardContains(query) || $0.fileName.localizedStandardContains(query) }) {
+            play(game)
+        }
+        if let systemID = DebugEnvironment.systemID {
+            selection = .system(systemID)
+        }
+        if DebugEnvironment.offersFolderSetup { isShowingFolderSetup = true }
+        if let queries = DebugEnvironment.selectionQueries {
+            let ids = queries.compactMap { part in
+                games.first { $0.title.localizedStandardContains(part) }?.persistentModelID
+            }
+            if ids.count > 1 {
+                gameSelection.replace(with: Set(ids), order: games.map(\.persistentModelID))
+            } else {
+                gameSelection.select(ids.first)
+            }
+        }
+        if let request = DebugEnvironment.shaderEditorRequest {
+            if case .preset(let preset)? = ShaderSelection(rawValue: request) {
+                shaderEditor.open(.preset(preset))
+            } else if request == "new" {
+                shaderEditor.open(.newPreset)
+            } else if SystemCatalog.system(withID: request) != nil {
+                shaderEditor.open(.system(request))
+            }
+            openWindow(id: WindowID.shaderEditor)
+        }
+        if let message = DebugEnvironment.metadataError {
+            metadata.lastError = message == "quota" ? MetadataFailure(ScreenScraperError.quotaExceeded)
+                : MetadataFailure(reason: message, message: message)
+        }
+    }
+    #endif
 
     // MARK: Columns
 
@@ -438,43 +364,14 @@ struct LibraryView: View {
 
     // MARK: Content
 
-    /// The games in view and what the views around them need to know.
-    private struct Shelf {
-        /// Sidebar selection, search, filter and sort applied; one game per
-        /// group when versions are grouped.
-        let games: [Game]
-        let groups: VariantGroups
-        let filterOptions: LibraryFilterOptions
-        let isGrouped: Bool
-    }
-
-    private func makeShelf() -> Shelf {
-        let scope = scopeGames
-        let groups = VariantGroups(selection == .hidden ? games.filter(\.isHidden) : libraryGames)
-        var result = scope
-        if !searchText.isEmpty {
-            result = result.filter {
-                $0.title.localizedStandardContains(searchText)
-                    || ($0.developer?.localizedStandardContains(searchText) ?? false)
-                    || ($0.genre?.localizedStandardContains(searchText) ?? false)
-                    || $0.collections.contains { $0.localizedStandardContains(searchText) }
-            }
-        }
-        if filter.isActive { result = result.filter(filter.matches) }
-        if selection == .recent {
-            result = LibrarySort.recentlyPlayed.sorted(result)
-        } else {
-            result = sort.sorted(result)
-            if isSortReversed { result.reverse() }
-        }
-        // Hidden lists every hidden file; elsewhere one card stands for all versions.
-        let isGrouped = groupsVariants && selection != .hidden
-        if isGrouped { result = groups.collapse(result) }
-        return Shelf(games: result, groups: groups, filterOptions: LibraryFilter.options(for: scope), isGrouped: isGrouped)
+    private func makeShelf() -> LibraryShelf {
+        LibraryShelf(library: games, query: LibraryShelf.Query(
+            selection: selection ?? .all, searchText: searchText, filter: filter, sort: sort,
+            isSortReversed: isSortReversed, groupsVariants: groupsVariants))
     }
 
     /// The games the sidebar counts: one per group when versions are grouped.
-    private func sidebarGames(_ shelf: Shelf) -> [Game] {
+    private func sidebarGames(_ shelf: LibraryShelf) -> [Game] {
         guard groupsVariants else { return libraryGames }
         // Under Hidden the shelf groups hidden games; the sidebar counts the others.
         let groups = selection == .hidden ? VariantGroups(libraryGames) : shelf.groups
@@ -482,7 +379,7 @@ struct LibraryView: View {
     }
 
     @ViewBuilder
-    private func content(_ shelf: Shelf) -> some View {
+    private func content(_ shelf: LibraryShelf) -> some View {
         let visibleGames = shelf.games
         switch LibraryState(hasFolders: !library.folders.isEmpty || !games.isEmpty, isScanning: library.isScanning,
                             libraryCount: games.count, visibleCount: visibleGames.count, searchText: searchText,
@@ -584,7 +481,7 @@ struct LibraryView: View {
     }
 
     @ViewBuilder
-    private func inspector(_ shelf: Shelf) -> some View {
+    private func inspector(_ shelf: LibraryShelf) -> some View {
         let selected = selectedGames(shelf)
         if selected.count > 1 {
             MultiGameInspector(actions: batchActions(for: selected))
@@ -625,25 +522,17 @@ struct LibraryView: View {
 
     /// The games of the sidebar selection, before search and filters.
     private var scopeGames: [Game] {
-        let games = libraryGames
-        return switch selection ?? .all {
-        case .all: games
-        case .favorites: games.filter(\.isFavorite)
-        case .recent: games.filter { $0.lastPlayed != nil }
-        case .hidden: self.games.filter(\.isHidden)
-        case .system(let id): games.filter { $0.systemID == id }
-        case .collection(let name): games.filter { $0.collections.contains(name) }
-        }
+        LibraryShelf.scope(of: games, for: selection ?? .all)
     }
 
-    private func selectedGames(_ shelf: Shelf) -> [Game] {
+    private func selectedGames(_ shelf: LibraryShelf) -> [Game] {
         guard !gameSelection.isEmpty else { return [] }
         let visible = shelf.games.filter { gameSelection.contains($0.persistentModelID) }
         // A game selected from outside the view (e.g. after an import) still has an inspector.
         return visible.isEmpty ? games.filter { gameSelection.contains($0.persistentModelID) } : visible
     }
 
-    private func singleSelectedGame(_ shelf: Shelf) -> Game? {
+    private func singleSelectedGame(_ shelf: LibraryShelf) -> Game? {
         let selected = selectedGames(shelf)
         return selected.count == 1 ? selected[0] : nil
     }
@@ -674,7 +563,7 @@ struct LibraryView: View {
         }
     }
 
-    private func subtitle(_ shelf: Shelf) -> String {
+    private func subtitle(_ shelf: LibraryShelf) -> String {
         let count = shelf.games.count
         let games = count == 1 ? String(localized: "1 game") : String(localized: "\(count) games")
         return filter.isActive ? String(localized: "\(games), filtered") : games
@@ -692,7 +581,7 @@ struct LibraryView: View {
     /// search field always stays at the trailing edge. So one toolbar on the
     /// split view, without spacers.
     @ToolbarContentBuilder
-    private func toolbar(_ shelf: Shelf) -> some ToolbarContent {
+    private func toolbar(_ shelf: LibraryShelf) -> some ToolbarContent {
         // Progress lives in the sidebar footer; only a collapsed sidebar needs a stand-in.
         if !columns.showsSidebar, Activity.isPending(library: library, metadata: metadata, systemMedia: systemMedia) {
             ToolbarItem {
@@ -847,7 +736,7 @@ struct LibraryView: View {
         Task { await session.launch(game, context: context, resume: resume, state: state) }
     }
 
-    private func actions(for game: Game, shelf: Shelf) -> GameActions {
+    private func actions(for game: Game, shelf: LibraryShelf) -> GameActions {
         let resumes = Preferences.resumeAutomatically
         return GameActions(
             game: game,
@@ -920,7 +809,7 @@ struct LibraryView: View {
         )
     }
 
-    private func versionActions(_ shelf: Shelf) -> VersionActions {
+    private func versionActions(_ shelf: LibraryShelf) -> VersionActions {
         VersionActions(
             play: { play($0) },
             prefer: { game in
