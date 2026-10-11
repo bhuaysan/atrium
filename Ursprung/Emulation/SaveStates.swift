@@ -81,6 +81,33 @@ nonisolated enum SaveStateIssue: Sendable, Hashable {
     case renderer(StateRenderer)
 }
 
+extension SaveStateIssue {
+    /// A short description, e.g. for a slot's help text.
+    var summary: String {
+        switch self {
+        case .unknownOrigin: String(localized: "Saved by an earlier version of Ursprung, possibly with another core.")
+        case .coreVersion(let version): String(localized: "Saved with core version \(version).")
+        case .differentGameFile: String(localized: "Saved from a different version of the game file.")
+        case .renderer(let renderer): String(localized: "Saved while the game rendered with \(renderer.displayName).")
+        }
+    }
+
+    /// The note after a state with this issue loaded.
+    var loadedNote: String {
+        String(localized: "State loaded. \(summary) If the game misbehaves, restart it.")
+    }
+
+    /// Why a state with this issue probably failed to load.
+    var failureReason: String {
+        switch self {
+        case .unknownOrigin: String(localized: "It was probably made with another core.")
+        case .coreVersion(let version): String(localized: "It was saved with core version \(version); the installed version can't read it.")
+        case .differentGameFile: String(localized: "It was saved from a different version of the game file.")
+        case .renderer(let renderer): String(localized: "It was saved while the game rendered with \(renderer.displayName). Switch back in Settings → Cores to load it.")
+        }
+    }
+}
+
 /// A save state on disk: in a slot, the automatic state, or one that a
 /// newer state replaced (history).
 nonisolated struct SaveStateSlot: Identifiable, Hashable, Sendable {
