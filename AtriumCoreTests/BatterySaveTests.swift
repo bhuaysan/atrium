@@ -2,7 +2,7 @@
 
 import Foundation
 import Testing
-@testable import Atrium
+@testable import AtriumCore
 
 @Suite("Battery saves")
 struct BatterySaveTests {

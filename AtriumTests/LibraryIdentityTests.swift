@@ -4,6 +4,7 @@ import Foundation
 import SwiftData
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 nonisolated private let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
 

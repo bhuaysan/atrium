@@ -1,47 +1,38 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import AtriumCore
 import Foundation
 
 /// Where a save state came from. Written next to every state as
 /// `slotN.json`; see docs/SAVES.md.
-nonisolated struct SaveStateManifest: Codable, Sendable, Hashable {
-    static let currentFormat = 1
+public nonisolated struct SaveStateManifest: Codable, Sendable, Hashable {
+    public static let currentFormat = 1
 
-    var format = SaveStateManifest.currentFormat
-    var coreID: String
-    var coreVersion: String
+    public var format = SaveStateManifest.currentFormat
+    public var coreID: String
+    public var coreVersion: String
     /// The ROM the state was made from, to notice a replaced file.
-    var gameCRC32: String?
-    var gameFileName: String
-    var gameFileSize: Int64
-    var created: Date
+    public var gameCRC32: String?
+    public var gameFileName: String
+    public var gameFileSize: Int64
+    public var created: Date
     /// A name the user gave the state, e.g. “Before the final boss”.
-    var name: String?
+    public var name: String?
     /// How the core rendered (`StateRenderer`); nil in states saved before
     /// Atrium recorded it.
-    var renderer: String?
+    public var renderer: String?
 }
 
 /// How a core rendered when it saved a state. States of some cores depend on
 /// it: one saved with paraLLEl-RDP (Vulkan) may not load into angrylion.
-nonisolated enum StateRenderer: String, Sendable, Hashable {
+public nonisolated enum StateRenderer: String, Sendable, Hashable {
     case software
     case opengl
     case vulkan
 
-    init(_ api: GraphicsAPI) {
-        self = switch api {
-        case .openGL: .opengl
-        case .vulkan: .vulkan
-        default: .software
-        }
-    }
-
     /// For messages: “Vulkan”, “OpenGL”, “software rendering”.
-    var displayName: String {
+    public var displayName: String {
         switch self {
-        case .software: String(localized: "software rendering")
+        case .software: String(localized: "software rendering", bundle: .module)
         case .opengl: "OpenGL"
         case .vulkan: "Vulkan"
         }
@@ -49,21 +40,30 @@ nonisolated enum StateRenderer: String, Sendable, Hashable {
 }
 
 /// What the running game looks like now, to compare a state's manifest with.
-nonisolated struct SaveStateContext: Sendable, Hashable {
-    let coreID: String
-    let coreVersion: String
-    let gameCRC32: String?
-    let gameFileName: String
-    let gameFileSize: Int64
+public nonisolated struct SaveStateContext: Sendable, Hashable {
+    public let coreID: String
+    public let coreVersion: String
+    public let gameCRC32: String?
+    public let gameFileName: String
+    public let gameFileSize: Int64
     /// Known once the game is loaded; nil where it doesn't matter (ARMSX2).
-    var renderer: StateRenderer? = nil
+    public var renderer: StateRenderer? = nil
 
-    func manifest(created: Date = .now) -> SaveStateManifest {
+    public init(coreID: String, coreVersion: String, gameCRC32: String?, gameFileName: String, gameFileSize: Int64, renderer: StateRenderer? = nil) {
+        self.coreID = coreID
+        self.coreVersion = coreVersion
+        self.gameCRC32 = gameCRC32
+        self.gameFileName = gameFileName
+        self.gameFileSize = gameFileSize
+        self.renderer = renderer
+    }
+
+    public func manifest(created: Date = .now) -> SaveStateManifest {
         SaveStateManifest(coreID: coreID, coreVersion: coreVersion, gameCRC32: gameCRC32, gameFileName: gameFileName,
                           gameFileSize: gameFileSize, created: created, renderer: renderer?.rawValue)
     }
 
-    func rendering(with renderer: StateRenderer) -> SaveStateContext {
+    public func rendering(with renderer: StateRenderer) -> SaveStateContext {
         var context = self
         context.renderer = renderer
         return context
@@ -71,7 +71,7 @@ nonisolated struct SaveStateContext: Sendable, Hashable {
 }
 
 /// Reasons a state may not load, or may load into a different game.
-nonisolated enum SaveStateIssue: Sendable, Hashable {
+public nonisolated enum SaveStateIssue: Sendable, Hashable {
     /// Saved by Atrium before states were kept per core: the core is unknown.
     case unknownOrigin
     /// Saved with another version of the same core.
@@ -84,66 +84,66 @@ nonisolated enum SaveStateIssue: Sendable, Hashable {
 
 extension SaveStateIssue {
     /// A short description, e.g. for a slot's help text.
-    var summary: String {
+    public var summary: String {
         switch self {
-        case .unknownOrigin: String(localized: "Saved by an earlier version of Atrium, possibly with another core.")
-        case .coreVersion(let version): String(localized: "Saved with core version \(version).")
-        case .differentGameFile: String(localized: "Saved from a different version of the game file.")
-        case .renderer(let renderer): String(localized: "Saved while the game rendered with \(renderer.displayName).")
+        case .unknownOrigin: String(localized: "Saved by an earlier version of Atrium, possibly with another core.", bundle: .module)
+        case .coreVersion(let version): String(localized: "Saved with core version \(version).", bundle: .module)
+        case .differentGameFile: String(localized: "Saved from a different version of the game file.", bundle: .module)
+        case .renderer(let renderer): String(localized: "Saved while the game rendered with \(renderer.displayName).", bundle: .module)
         }
     }
 
     /// The note after a state with this issue loaded.
-    var loadedNote: String {
-        String(localized: "State loaded. \(summary) If the game misbehaves, restart it.")
+    public var loadedNote: String {
+        String(localized: "State loaded. \(summary) If the game misbehaves, restart it.", bundle: .module)
     }
 
     /// Why a state with this issue probably failed to load.
-    var failureReason: String {
+    public var failureReason: String {
         switch self {
-        case .unknownOrigin: String(localized: "It was probably made with another core.")
-        case .coreVersion(let version): String(localized: "It was saved with core version \(version); the installed version can't read it.")
-        case .differentGameFile: String(localized: "It was saved from a different version of the game file.")
-        case .renderer(let renderer): String(localized: "It was saved while the game rendered with \(renderer.displayName). Switch back in Settings → Cores to load it.")
+        case .unknownOrigin: String(localized: "It was probably made with another core.", bundle: .module)
+        case .coreVersion(let version): String(localized: "It was saved with core version \(version); the installed version can't read it.", bundle: .module)
+        case .differentGameFile: String(localized: "It was saved from a different version of the game file.", bundle: .module)
+        case .renderer(let renderer): String(localized: "It was saved while the game rendered with \(renderer.displayName). Switch back in Settings → Cores to load it.", bundle: .module)
         }
     }
 }
 
 /// A save state on disk: in a slot, the automatic state, or one that a
 /// newer state replaced (history).
-nonisolated struct SaveStateSlot: Identifiable, Hashable, Sendable {
-    let slot: Int
-    let date: Date
-    let stateURL: URL
-    let thumbnailURL: URL
-    let manifestURL: URL
+public nonisolated struct SaveStateSlot: Identifiable, Hashable, Sendable {
+    public let slot: Int
+    public let date: Date
+    public let stateURL: URL
+    public let thumbnailURL: URL
+    public let manifestURL: URL
     /// nil for states from earlier versions.
-    var manifest: SaveStateManifest?
+    public var manifest: SaveStateManifest?
     /// Found in the game's folder instead of the core's (earlier versions).
-    var isLegacy = false
+    public var isLegacy = false
     /// For states in the history: when they were replaced or deleted.
-    var replaced: Date?
-    var id: String { stateURL.path(percentEncoded: false) }
+    public var replaced: Date?
+    public var id: String { stateURL.path(percentEncoded: false) }
 
-    var name: String? { manifest?.name }
-    var isAutosave: Bool { slot == SaveStateStore.autosaveSlot }
-    var isHistory: Bool { replaced != nil }
+    public var name: String? { manifest?.name }
+    public var isAutosave: Bool { slot == SaveStateStore.autosaveSlot }
+    public var isHistory: Bool { replaced != nil }
     /// Written by ARMSX2 (`ARMSX2States`) rather than through a libretro core.
-    var isARMSX2: Bool { stateURL.pathExtension.lowercased() == ARMSX2States.fileExtension }
+    public var isARMSX2: Bool { stateURL.pathExtension.lowercased() == ARMSX2States.fileExtension }
     /// Only states with a manifest can be named; others are of unknown origin.
     /// ARMSX2's states get their manifest when they are named.
-    var canRename: Bool { (manifest != nil || isARMSX2) && !isLegacy }
+    public var canRename: Bool { (manifest != nil || isARMSX2) && !isLegacy }
 
     /// “Slot 3”, “Quick Save” or “Automatic State”, for lists.
-    var slotTitle: String {
+    public var slotTitle: String {
         switch slot {
-        case SaveStateStore.autosaveSlot: String(localized: "Automatic State")
-        case 0: String(localized: "Quick Save")
-        default: String(localized: "Slot \(slot)")
+        case SaveStateStore.autosaveSlot: String(localized: "Automatic State", bundle: .module)
+        case 0: String(localized: "Quick Save", bundle: .module)
+        default: String(localized: "Slot \(slot)", bundle: .module)
         }
     }
 
-    func issues(for context: SaveStateContext) -> [SaveStateIssue] {
+    public func issues(for context: SaveStateContext) -> [SaveStateIssue] {
         guard let manifest else { return [.unknownOrigin] }
         var issues: [SaveStateIssue] = []
         if manifest.coreVersion != context.coreVersion { issues.append(.coreVersion(manifest.coreVersion)) }
@@ -172,18 +172,18 @@ nonisolated struct SaveStateSlot: Identifiable, Hashable, Sendable {
 /// ARMSX2 writes its own states into its folder (`<states>/<game id>/armsx2/`)
 /// under its own names; `ARMSX2States` reads them, and the functions here that
 /// take a `SaveStateSlot` handle both kinds.
-nonisolated enum SaveStateStore {
-    static let slotRange = 0...9
+public nonisolated enum SaveStateStore {
+    public static let slotRange = 0...9
 
-    static func gameDirectory(in states: URL, gameID: UUID) -> URL {
+    public static func gameDirectory(in states: URL, gameID: UUID) -> URL {
         states.appending(path: gameID.uuidString, directoryHint: .isDirectory)
     }
 
-    static func directory(in states: URL, gameID: UUID, coreID: String) -> URL {
+    public static func directory(in states: URL, gameID: UUID, coreID: String) -> URL {
         gameDirectory(in: states, gameID: gameID).appending(path: coreID, directoryHint: .isDirectory)
     }
 
-    static func slots(in states: URL, gameID: UUID, coreID: String) -> [SaveStateSlot] {
+    public static func slots(in states: URL, gameID: UUID, coreID: String) -> [SaveStateSlot] {
         let coreDirectory = directory(in: states, gameID: gameID, coreID: coreID)
         let legacyDirectory = gameDirectory(in: states, gameID: gameID)
         return slotRange.compactMap { slot in
@@ -198,14 +198,14 @@ nonisolated enum SaveStateStore {
     }
 
     /// The state that a save into `slot` writes for `coreID`.
-    static func stateURL(in states: URL, gameID: UUID, coreID: String, slot: Int) -> URL {
+    public static func stateURL(in states: URL, gameID: UUID, coreID: String, slot: Int) -> URL {
         directory(in: states, gameID: gameID, coreID: coreID).appending(path: "slot\(slot).state")
     }
 
     /// Writes a state and its manifest. The state it replaces goes into the
     /// history, but only once the new one is safely on disk: a failed write
     /// leaves the slot as it was.
-    static func write(_ data: Data, manifest: SaveStateManifest, slot: Int, in directory: URL, date: Date = .now) throws {
+    public static func write(_ data: Data, manifest: SaveStateManifest, slot: Int, in directory: URL, date: Date = .now) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let pending = directory.appending(path: ".slot\(slot)-\(UUID().uuidString).state")
         defer { try? FileManager.default.removeItem(at: pending) }
@@ -224,9 +224,9 @@ nonisolated enum SaveStateStore {
 
     /// The automatic state saved when a game stops: `autosave.state` in the
     /// core's folder, apart from the numbered slots.
-    static let autosaveSlot = -1
+    public static let autosaveSlot = -1
 
-    static func autosave(in states: URL, gameID: UUID, coreID: String) -> SaveStateSlot? {
+    public static func autosave(in states: URL, gameID: UUID, coreID: String) -> SaveStateSlot? {
         let directory = directory(in: states, gameID: gameID, coreID: coreID)
         guard var found = slotFile(named: "autosave", slot: autosaveSlot, in: directory) else { return nil }
         found.manifest = readManifest(found.manifestURL)
@@ -234,13 +234,13 @@ nonisolated enum SaveStateStore {
     }
 
     /// Writes the automatic state. Like a slot, a failed write keeps the previous one.
-    static func writeAutosave(_ data: Data, manifest: SaveStateManifest, in directory: URL) throws {
+    public static func writeAutosave(_ data: Data, manifest: SaveStateManifest, in directory: URL) throws {
         try write(data, manifest: manifest, name: "autosave", in: directory)
     }
 
     /// Removes a state for good. Throws when a file stays: the state itself
     /// first (then nothing is removed), its thumbnail and manifest after.
-    static func delete(_ slot: SaveStateSlot) throws {
+    public static func delete(_ slot: SaveStateSlot) throws {
         let fileManager = FileManager.default
         var failure: (any Error)?
         for url in [slot.stateURL, slot.thumbnailURL, slot.manifestURL]
@@ -258,7 +258,7 @@ nonisolated enum SaveStateStore {
     /// Deletes a state the way the user does: a slot's state goes into the
     /// history, where it can be restored; a state in the history is removed.
     /// A slot's state that can't go into the history stays.
-    static func discard(_ state: SaveStateSlot, date: Date = .now) throws {
+    public static func discard(_ state: SaveStateSlot, date: Date = .now) throws {
         guard !state.isHistory, !state.isLegacy, !state.isAutosave else { return try delete(state) }
         if state.isARMSX2 { return try ARMSX2States.archive(state, date: date) }
         try archive(slot: state.slot, in: state.stateURL.deletingLastPathComponent(), date: date)
@@ -266,7 +266,7 @@ nonisolated enum SaveStateStore {
 
     /// Names a state, or removes its name with nil or an empty name. A state
     /// without a manifest gets one from `origin` (ARMSX2's states).
-    static func rename(_ state: SaveStateSlot, to name: String?, origin: SaveStateContext? = nil) throws {
+    public static func rename(_ state: SaveStateSlot, to name: String?, origin: SaveStateContext? = nil) throws {
         guard var manifest = state.manifest ?? origin?.manifest(created: state.date) else { return }
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         manifest.name = trimmed?.isEmpty == false ? trimmed : nil
@@ -276,15 +276,15 @@ nonisolated enum SaveStateStore {
     // MARK: History
 
     /// States replaced or deleted per game and core that are kept; older ones go.
-    static let historyLimit = 20
+    public static let historyLimit = 20
 
-    static func historyDirectory(_ coreDirectory: URL) -> URL {
+    public static func historyDirectory(_ coreDirectory: URL) -> URL {
         coreDirectory.appending(path: "History", directoryHint: .isDirectory)
     }
 
     /// Moves the state in `slot` (if any) into the history as
     /// `History/<time>-slotN.*`.
-    static func archive(slot: Int, in directory: URL, date: Date = .now, prune: Bool = true) throws {
+    public static func archive(slot: Int, in directory: URL, date: Date = .now, prune: Bool = true) throws {
         let name = "slot\(slot)"
         let state = directory.appending(path: "\(name).state")
         guard FileManager.default.fileExists(atPath: state.path(percentEncoded: false)) else { return }
@@ -302,11 +302,11 @@ nonisolated enum SaveStateStore {
     }
 
     /// The replaced and deleted states of a game for a core, newest first.
-    static func history(in states: URL, gameID: UUID, coreID: String) -> [SaveStateSlot] {
+    public static func history(in states: URL, gameID: UUID, coreID: String) -> [SaveStateSlot] {
         history(inCoreDirectory: directory(in: states, gameID: gameID, coreID: coreID))
     }
 
-    static func history(inCoreDirectory directory: URL) -> [SaveStateSlot] {
+    public static func history(inCoreDirectory directory: URL) -> [SaveStateSlot] {
         let history = historyDirectory(directory)
         let files = (try? FileManager.default.contentsOfDirectory(at: history, includingPropertiesForKeys: nil)) ?? []
         let states = files.filter { $0.pathExtension == "state" }.compactMap { url -> SaveStateSlot? in
@@ -325,7 +325,7 @@ nonisolated enum SaveStateStore {
     /// Puts a state from the history back into `slot`. The state there now
     /// goes into the history in turn. The history is pruned only afterwards:
     /// `entry` may be its oldest state.
-    static func restore(_ entry: SaveStateSlot, toSlot slot: Int, in directory: URL, date: Date = .now) throws {
+    public static func restore(_ entry: SaveStateSlot, toSlot slot: Int, in directory: URL, date: Date = .now) throws {
         // ARMSX2's states go back under their own name, which holds the slot.
         if entry.isARMSX2 { return try ARMSX2States.restore(entry, in: directory, date: date) }
         let data = try Data(contentsOf: entry.stateURL)
@@ -342,33 +342,33 @@ nonisolated enum SaveStateStore {
         pruneHistory(in: directory)
     }
 
-    static func pruneHistory(in directory: URL) {
+    public static func pruneHistory(in directory: URL) {
         for entry in history(inCoreDirectory: directory).dropFirst(historyLimit) { try? delete(entry) }
     }
 
-    static func historyStamp(_ date: Date) -> String {
+    public static func historyStamp(_ date: Date) -> String {
         String(Int64((date.timeIntervalSince1970 * 1000).rounded()))
     }
 
-    static func historyDate(_ stamp: String) -> Date? {
+    public static func historyDate(_ stamp: String) -> Date? {
         Int64(stamp).map { Date(timeIntervalSince1970: Double($0) / 1000) }
     }
 
     // MARK: All states of a game
 
     /// The states of one core, for the library's save state browser.
-    struct CoreStates: Identifiable, Sendable {
+    public struct CoreStates: Identifiable, Sendable {
         /// nil for states of unknown origin (earlier versions).
-        let coreID: String?
-        var autosave: SaveStateSlot?
-        var slots: [SaveStateSlot]
-        var history: [SaveStateSlot]
-        var id: String { coreID ?? "" }
-        var isEmpty: Bool { autosave == nil && slots.isEmpty && history.isEmpty }
+        public let coreID: String?
+        public var autosave: SaveStateSlot?
+        public var slots: [SaveStateSlot]
+        public var history: [SaveStateSlot]
+        public var id: String { coreID ?? "" }
+        public var isEmpty: Bool { autosave == nil && slots.isEmpty && history.isEmpty }
     }
 
     /// Every state of a game, per core; states of unknown origin last.
-    static func allStates(in states: URL, gameID: UUID) -> [CoreStates] {
+    public static func allStates(in states: URL, gameID: UUID) -> [CoreStates] {
         let gameDirectory = gameDirectory(in: states, gameID: gameID)
         let entries = (try? FileManager.default.contentsOfDirectory(at: gameDirectory, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
         var result: [CoreStates] = []
@@ -401,7 +401,7 @@ nonisolated enum SaveStateStore {
         return encoder
     }
 
-    static func readManifest(_ url: URL) -> SaveStateManifest? {
+    public static func readManifest(_ url: URL) -> SaveStateManifest? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

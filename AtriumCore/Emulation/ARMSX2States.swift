@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import AtriumCore
 import Foundation
 
 /// ARMSX2's save state files in a game's state folder (docs/STANDALONE_PLAN.md, S8).
@@ -11,20 +10,20 @@ import Foundation
 /// only what ARMSX2 does not keep: a name in `<state>.json` next to the state
 /// (a `SaveStateManifest`), and the history of replaced states in `History/`
 /// as `<time>-<state>.p2s`, like the slots of libretro cores.
-nonisolated enum ARMSX2States {
-    static let fileExtension = "p2s"
+public nonisolated enum ARMSX2States {
+    public static let fileExtension = "p2s"
     private static let screenshotEntry = "Screenshot.png"
     private static let versionEntry = "PCSX2 Savestate Version.id"
     /// What ARMSX2 refuses to load a state without (`SaveState_UnzipFromZip`
     /// and the required `SavestateEntries` at the pinned commit).
-    static let requiredEntries = [
+    public static let requiredEntries = [
         "PCSX2 Internal Structures.dat", "eeMemory.bin", "iopMemory.bin", "eeHwRegs.bin", "iopHwRegs.bin",
         "Scratchpad.bin", "vu0Memory.bin", "vu1Memory.bin", "vu0MicroMem.bin", "vu1MicroMem.bin",
         "SPU2.bin", "PAD.bin", "GS.bin",
     ]
 
     /// What a state file holds, from its name.
-    enum Kind: Hashable, Sendable {
+    public enum Kind: Hashable, Sendable {
         /// Atrium's slot number (see `armsx2Slot`).
         case slot(Int)
         case resume
@@ -33,7 +32,7 @@ nonisolated enum ARMSX2States {
     /// The kind of `<serial> (<CRC>).<NN>.p2s` or `….resume.p2s`. Copies kept
     /// when saves were merged (`… .03 (from backup …).p2s`) count as their
     /// slot; `.backup`, `.part` and hidden files are not states.
-    static func kind(ofFileName name: String) -> Kind? {
+    public static func kind(ofFileName name: String) -> Kind? {
         guard !name.hasPrefix("."), name.lowercased().hasSuffix("." + fileExtension) else { return nil }
         let stem = name.dropLast(fileExtension.count + 1)
         guard let match = stem.wholeMatch(of: #/.+\.(?<tag>\d{1,2}|resume)(?: \([^()]*\))?/#.ignoresCase()) else { return nil }
@@ -45,7 +44,7 @@ nonisolated enum ARMSX2States {
     /// the Quick Save key in ARMSX2's window and Quick Save in Atrium then
     /// keep the same state. Atrium's slot 1 takes ARMSX2's slot 0 in
     /// exchange; every other slot has the same number in both.
-    static func armsx2Slot(_ slot: Int) -> Int {
+    public static func armsx2Slot(_ slot: Int) -> Int {
         switch slot {
         case 0: 1
         case 1: 0
@@ -58,7 +57,7 @@ nonisolated enum ARMSX2States {
     /// The states in `folder`: the newest resume state as the automatic
     /// state, everything else by slot. Resume states of another disc or
     /// merged copies of one show up among the slots.
-    static func states(in folder: URL) -> (autosave: SaveStateSlot?, slots: [SaveStateSlot]) {
+    public static func states(in folder: URL) -> (autosave: SaveStateSlot?, slots: [SaveStateSlot]) {
         var resume: [SaveStateSlot] = []
         var slots: [SaveStateSlot] = []
         for name in fileNames(in: folder) {
@@ -82,7 +81,7 @@ nonisolated enum ARMSX2States {
     }
 
     /// The states in `folder/History`, newest first.
-    static func history(in folder: URL) -> [SaveStateSlot] {
+    public static func history(in folder: URL) -> [SaveStateSlot] {
         let history = SaveStateStore.historyDirectory(folder)
         return fileNames(in: history).compactMap { name -> SaveStateSlot? in
             guard let dash = name.firstIndex(of: "-"),
@@ -96,7 +95,7 @@ nonisolated enum ARMSX2States {
     }
 
     /// `<serial> (<CRC>).resume.p2s`, written by ARMSX2 when Atrium quits it.
-    static func resumeState(in folder: URL) -> URL? {
+    public static func resumeState(in folder: URL) -> URL? {
         fileNames(in: folder).filter { $0.hasSuffix(".resume.p2s") }
             .map { folder.appending(path: $0) }
             .max { modificationDate($0) < modificationDate($1) }
@@ -115,7 +114,7 @@ nonisolated enum ARMSX2States {
     }
 
     /// `<state>.json` next to the state.
-    static func manifestURL(for state: URL) -> URL {
+    public static func manifestURL(for state: URL) -> URL {
         state.deletingPathExtension().appendingPathExtension("json")
     }
 
@@ -134,7 +133,7 @@ nonisolated enum ARMSX2States {
     // MARK: History
 
     /// Moves a state and its manifest into the history.
-    static func archive(_ state: SaveStateSlot, date: Date = .now) throws {
+    public static func archive(_ state: SaveStateSlot, date: Date = .now) throws {
         _ = try moveToHistory(state, date: date)
         SaveStateStore.pruneHistory(in: state.stateURL.deletingLastPathComponent())
     }
@@ -161,7 +160,7 @@ nonisolated enum ARMSX2States {
     /// The state there now goes into the history in turn. The history is
     /// pruned only afterwards: `entry` may be its oldest state. If the entry
     /// can't be moved back, the state that was there returns.
-    static func restore(_ entry: SaveStateSlot, in folder: URL, date: Date = .now) throws {
+    public static func restore(_ entry: SaveStateSlot, in folder: URL, date: Date = .now) throws {
         let name = entry.stateURL.lastPathComponent
         guard let dash = name.firstIndex(of: "-") else { return }
         let destination = folder.appending(path: String(name[name.index(after: dash)...]))
@@ -187,14 +186,14 @@ nonisolated enum ARMSX2States {
     // MARK: Contents
 
     /// The screenshot ARMSX2 stores in the state (640 × 480 PNG).
-    static func screenshot(of url: URL) -> Data? {
+    public static func screenshot(of url: URL) -> Data? {
         guard let zip = try? ZipArchive(url: url),
               let entry = zip.files.first(where: { $0.path == screenshotEntry }) else { return nil }
         return try? zip.data(of: entry)
     }
 
     /// The `u32` at the start of the state's `PCSX2 Savestate Version.id`.
-    static func saveStateVersion(of url: URL) -> UInt32? {
+    public static func saveStateVersion(of url: URL) -> UInt32? {
         guard let zip = try? ZipArchive(url: url),
               let entry = zip.files.first(where: { $0.path == versionEntry }),
               let data = try? zip.data(of: entry), data.count >= 4 else { return nil }
@@ -202,7 +201,7 @@ nonisolated enum ARMSX2States {
     }
 
     /// ARMSX2 loads states of the same major version that are not newer than its own.
-    static func isCompatible(_ version: UInt32, with current: UInt32) -> Bool {
+    public static func isCompatible(_ version: UInt32, with current: UInt32) -> Bool {
         version >> 16 == current >> 16 && version <= current
     }
 
@@ -211,7 +210,7 @@ nonisolated enum ARMSX2States {
     /// has every part ARMSX2 requires, each within the file. The compressed
     /// data itself is not checked (ARMSX2 uses Zstandard). Never when the
     /// format is unknown.
-    static func isLoadable(_ url: URL, by current: UInt32?) -> Bool {
+    public static func isLoadable(_ url: URL, by current: UInt32?) -> Bool {
         guard let current, let zip = try? ZipArchive(url: url),
               let entry = zip.files.first(where: { $0.path == versionEntry }),
               let data = try? zip.data(of: entry), data.count >= 4,
@@ -230,7 +229,7 @@ nonisolated enum ARMSX2States {
     }
 
     /// What a manifest records for a state ARMSX2 wrote, when the user names it.
-    static func context(for state: SaveStateSlot, gameFileName: String, gameFileSize: Int64) -> SaveStateContext {
+    public static func context(for state: SaveStateSlot, gameFileName: String, gameFileSize: Int64) -> SaveStateContext {
         SaveStateContext(coreID: state.stateURL.deletingLastPathComponent().lastPathComponent,
                          coreVersion: saveStateVersion(of: state.stateURL).map { String(format: "%08X", $0) } ?? "",
                          gameCRC32: nil, gameFileName: gameFileName, gameFileSize: gameFileSize)
@@ -240,13 +239,13 @@ nonisolated enum ARMSX2States {
 
     /// The file ARMSX2 writes for Atrium's `slot` of the running disc
     /// (`VMManager::GetSaveStateFileName`); PINE reports the CRC in lowercase.
-    static func slotFileName(serial: String, crc: String, slot: Int) -> String {
+    public static func slotFileName(serial: String, crc: String, slot: Int) -> String {
         "\(serial) (\(crc.uppercased())).\(String(format: "%02d", armsx2Slot(slot))).p2s"
     }
 
     /// Whether ARMSX2 can load `state` by its slot: a slot's own file, not
     /// the resume state, a merged copy or one from the history.
-    static func isSlotFile(_ state: SaveStateSlot) -> Bool {
+    public static func isSlotFile(_ state: SaveStateSlot) -> Bool {
         guard state.isARMSX2, !state.isHistory, case .slot = kind(ofFileName: state.stateURL.lastPathComponent) else { return false }
         return !FileMerge.isLabelledCopy(state.stateURL)
     }
@@ -258,8 +257,8 @@ nonisolated enum ARMSX2States {
     /// have reached ARMSX2, nothing takes it back: ARMSX2 can still write the
     /// state after the wait has ended, so the copy in the history stays.
     @concurrent
-    static func save(slot: Int, through client: PINEClient, in folder: URL,
-                     timeout: Duration = .seconds(10)) async throws -> URL {
+    public static func save(slot: Int, through client: PINEClient, in folder: URL,
+                            timeout: Duration = .seconds(10)) async throws -> URL {
         let url = folder.appending(path: try await slotFileName(slot: slot, through: client))
         try Task.checkCancellation()
         let previous = modificationDate(url)
@@ -307,8 +306,8 @@ nonisolated enum ARMSX2States {
     /// when that is the file ARMSX2 would load. ARMSX2 shows a dialog for a
     /// state it cannot read, which crashes it, so the version is checked first.
     @concurrent
-    static func load(slot: Int, in folder: URL, expected: URL? = nil, through client: PINEClient,
-                     saveStateVersion: UInt32?) async throws {
+    public static func load(slot: Int, in folder: URL, expected: URL? = nil, through client: PINEClient,
+                            saveStateVersion: UInt32?) async throws {
         let url = folder.appending(path: try await slotFileName(slot: slot, through: client))
         if let expected, expected.standardizedFileURL.path(percentEncoded: false) != url.standardizedFileURL.path(percentEncoded: false) {
             throw ARMSX2ControlError.otherDisc
@@ -371,7 +370,7 @@ nonisolated enum ARMSX2States {
     /// from a point older than the memory card. Every old one goes: the next
     /// newest would otherwise become the automatic state. Merged copies are
     /// not automatic states and stay.
-    static func removeStaleResumeState(in folder: URL, olderThan date: Date) {
+    public static func removeStaleResumeState(in folder: URL, olderThan date: Date) {
         guard let newest = resumeState(in: folder), modificationDate(newest) < date else { return }
         for name in fileNames(in: folder) where name.hasSuffix(".resume.p2s") {
             let state = folder.appending(path: name)
@@ -390,7 +389,7 @@ nonisolated enum ARMSX2States {
 }
 
 /// Why a save or load through PINE did not happen.
-nonisolated enum ARMSX2ControlError: LocalizedError, Equatable {
+public nonisolated enum ARMSX2ControlError: LocalizedError, Equatable {
     /// PINE does not answer: ARMSX2 is starting, quitting, or in hardcore mode.
     case notAnswering
     /// ARMSX2 runs, but no game yet (or one without a serial).
@@ -401,7 +400,7 @@ nonisolated enum ARMSX2ControlError: LocalizedError, Equatable {
     /// The slot holds a state of another disc of the game.
     case otherDisc
 
-    init(_ error: any Error) {
+    public init(_ error: any Error) {
         switch error {
         case let error as ARMSX2ControlError: self = error
         case PINEClient.Failure.refused: self = .noGame
@@ -409,18 +408,18 @@ nonisolated enum ARMSX2ControlError: LocalizedError, Equatable {
         }
     }
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .notAnswering:
-            String(localized: "ARMSX2 doesn't answer right now. Try again in a moment, or save in its window.")
+            String(localized: "ARMSX2 doesn't answer right now. Try again in a moment, or save in its window.", bundle: .module)
         case .noGame:
-            String(localized: "ARMSX2 isn't running the game yet. Try again in a moment.")
+            String(localized: "ARMSX2 isn't running the game yet. Try again in a moment.", bundle: .module)
         case .notSaved:
-            String(localized: "ARMSX2 didn't save the state. Its window may say why, for example while the memory card is being written.")
+            String(localized: "ARMSX2 didn't save the state. Its window may say why, for example while the memory card is being written.", bundle: .module)
         case .emptySlot:
-            String(localized: "No saved state in this slot")
+            String(localized: "No saved state in this slot", bundle: .module)
         case .otherDisc:
-            String(localized: "This state belongs to another disc of the game.")
+            String(localized: "This state belongs to another disc of the game.", bundle: .module)
         }
     }
 }

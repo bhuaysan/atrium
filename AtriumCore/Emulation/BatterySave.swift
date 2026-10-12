@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import AtriumCore
 import Foundation
 
 /// Location of a game's battery save (.srm).
@@ -8,16 +7,16 @@ import Foundation
 /// Games are identified by their library ID, not by their file name: two ROMs
 /// that share a file name (`Original/Game.sfc`, `Hack/Game.sfc`, or `Game.sfc`
 /// next to `Game.smc`) must never share a save.
-nonisolated enum BatterySave {
+public nonisolated enum BatterySave {
     /// `<saves>/<system>/<game id>/<base name>.srm`
-    static func url(in saves: URL, systemID: String, gameID: UUID, baseName: String) -> URL {
+    public static func url(in saves: URL, systemID: String, gameID: UUID, baseName: String) -> URL {
         saves.appending(path: systemID, directoryHint: .isDirectory)
             .appending(path: gameID.uuidString, directoryHint: .isDirectory)
             .appending(path: baseName + ".srm")
     }
 
     /// Earlier versions kept every save at `<saves>/<system>/<base name>.srm`.
-    static func legacyURL(in saves: URL, systemID: String, baseName: String) -> URL {
+    public static func legacyURL(in saves: URL, systemID: String, baseName: String) -> URL {
         saves.appending(path: systemID, directoryHint: .isDirectory).appending(path: baseName + ".srm")
     }
 
@@ -26,7 +25,7 @@ nonisolated enum BatterySave {
     /// the legacy file could belong to any of them, so it stays untouched
     /// rather than being handed to the wrong game.
     @discardableResult
-    static func migrateLegacy(to destination: URL, legacy: URL, isUnambiguous: Bool) -> Bool {
+    public static func migrateLegacy(to destination: URL, legacy: URL, isUnambiguous: Bool) -> Bool {
         let fileManager = FileManager.default
         guard isUnambiguous,
               !fileManager.fileExists(atPath: destination.path(percentEncoded: false)),
@@ -42,7 +41,7 @@ nonisolated enum BatterySave {
 
     /// Makes `source` the save at `destination`. A save that is already there
     /// is kept next to it as "<name> (<label>).srm".
-    static func importSave(_ source: URL, to destination: URL, label: String) throws {
+    public static func importSave(_ source: URL, to destination: URL, label: String) throws {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         if fileManager.fileExists(atPath: destination.path(percentEncoded: false)) {
@@ -52,7 +51,7 @@ nonisolated enum BatterySave {
     }
 
     /// Real-time clock data some cores keep apart from save RAM, next to the save.
-    static func rtcURL(forSave save: URL) -> URL {
+    public static func rtcURL(forSave save: URL) -> URL {
         save.deletingPathExtension().appendingPathExtension("rtc")
     }
 
@@ -60,7 +59,7 @@ nonisolated enum BatterySave {
     /// still holds the save under the old name; when it is the only one, it
     /// takes the new name (and so does its clock file).
     @discardableResult
-    static func adoptRenamed(at destination: URL) -> Bool {
+    public static func adoptRenamed(at destination: URL) -> Bool {
         var adopted = false
         let directory = destination.deletingLastPathComponent()
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
@@ -77,13 +76,13 @@ nonisolated enum BatterySave {
 
 /// The save files of one library entry: its battery save folder and its
 /// save states.
-nonisolated enum GameSaveFiles {
+public nonisolated enum GameSaveFiles {
     /// Moves the saves of the entry `sourceID` to the entry `targetID`, which
     /// is known by the file name `baseName` from now on. Nothing is lost:
     /// where both have a file, the newer one is used and the older one kept
     /// next to it.
-    static func merge(from sourceID: UUID, into targetID: UUID, systemID: String, baseName: String,
-                      saves: URL, states: URL, labels: FileMerge.Labels) throws -> FileMerge.Report {
+    public static func merge(from sourceID: UUID, into targetID: UUID, systemID: String, baseName: String,
+                             saves: URL, states: URL, labels: FileMerge.Labels) throws -> FileMerge.Report {
         let targetSave = BatterySave.url(in: saves, systemID: systemID, gameID: targetID, baseName: baseName)
         // The target's own save may still carry an old name; it takes the new
         // one first, so the comparison below is between the right files.
@@ -109,8 +108,8 @@ nonisolated enum GameSaveFiles {
     /// folder moves from `oldSystemID` to `newSystemID`. Where both have a
     /// file, the newer one is used and the older one kept next to it.
     @discardableResult
-    static func changeSystem(of gameID: UUID, from oldSystemID: String, to newSystemID: String, saves: URL,
-                             labels: FileMerge.Labels) throws -> FileMerge.Report {
+    public static func changeSystem(of gameID: UUID, from oldSystemID: String, to newSystemID: String, saves: URL,
+                                    labels: FileMerge.Labels) throws -> FileMerge.Report {
         guard oldSystemID != newSystemID else { return FileMerge.Report() }
         let source = saves.appending(path: oldSystemID, directoryHint: .isDirectory)
             .appending(path: gameID.uuidString, directoryHint: .isDirectory)
@@ -124,7 +123,7 @@ nonisolated enum GameSaveFiles {
     /// after the game in the system's save folder. After a rename those
     /// "<old name>.<ext>" files follow the game, unless a file with the new
     /// name is already there. Callers make sure no other game uses the old name.
-    static func renameCoreSaves(in systemSaves: URL, from oldBaseName: String, to newBaseName: String) {
+    public static func renameCoreSaves(in systemSaves: URL, from oldBaseName: String, to newBaseName: String) {
         guard oldBaseName != newBaseName,
               let files = try? FileManager.default.contentsOfDirectory(at: systemSaves, includingPropertiesForKeys: [.isRegularFileKey]) else { return }
         for file in files where file.lastPathComponent.hasPrefix(oldBaseName + ".") {
@@ -140,23 +139,25 @@ nonisolated enum GameSaveFiles {
 /// The memory card of a PlayStation 2 game: ARMSX2 keeps one card per game
 /// in the game's save folder, `<saves>/<system>/<game id>/Mcd001.ps2`.
 /// Moving, merging and backing up that folder works as for battery saves.
-nonisolated enum PS2MemoryCard {
+public nonisolated enum PS2MemoryCard {
     /// Sizes of PCSX2 memory cards (8 to 64 MB, 528-byte pages with ECC).
-    static let sizes: Set<Int> = [8_650_752, 17_301_504, 34_603_008, 69_206_016]
+    public static let sizes: Set<Int> = [8_650_752, 17_301_504, 34_603_008, 69_206_016]
     private static let magic = Data("Sony PS2 Memory Card Format ".utf8)
+    /// The single memory card of a game (slot 2 stays empty).
+    public static let fileName = "Mcd001.ps2"
 
-    static func folder(in saves: URL, systemID: String, gameID: UUID) -> URL {
+    public static func folder(in saves: URL, systemID: String, gameID: UUID) -> URL {
         saves.appending(path: systemID, directoryHint: .isDirectory)
             .appending(path: gameID.uuidString, directoryHint: .isDirectory)
     }
 
-    static func url(in saves: URL, systemID: String, gameID: UUID) -> URL {
-        folder(in: saves, systemID: systemID, gameID: gameID).appending(path: PCSX2Config.memoryCardFileName)
+    public static func url(in saves: URL, systemID: String, gameID: UUID) -> URL {
+        folder(in: saves, systemID: systemID, gameID: gameID).appending(path: fileName)
     }
 
     /// A formatted card starts with its format name; a new card is still
     /// unformatted (all 0xFF) and only recognisable by its size.
-    static func isMemoryCard(_ url: URL) -> Bool {
+    public static func isMemoryCard(_ url: URL) -> Bool {
         guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
               size >= 8_388_608, size <= sizes.max()!,
               let handle = try? FileHandle(forReadingFrom: url) else { return false }

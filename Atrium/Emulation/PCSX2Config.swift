@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import Foundation
 
 /// An ini file the way ARMSX2 reads and writes it (SimpleIni): sections in
@@ -114,8 +115,6 @@ nonisolated struct PCSX2Config: Equatable, Sendable {
     var fullscreen: Bool
     var controls: ARMSX2Controls
 
-    /// The single memory card of a game (slot 2 stays empty).
-    static let memoryCardFileName = "Mcd001.ps2"
     /// Automatic, which is Metal on macOS (`GSUtil::GetPreferredRenderer`).
     /// OpenGL (12) cannot create a device on macOS and crashes ARMSX2 with an
     /// error dialog (S5); naming Metal (17) shows an "unsafe settings"
@@ -149,7 +148,7 @@ nonisolated struct PCSX2Config: Equatable, Sendable {
             ("Filenames", [E("BIOS", biosFileName)]),
             ("MemoryCards", [
                 E("Slot1_Enable", "true"),
-                E("Slot1_Filename", Self.memoryCardFileName),
+                E("Slot1_Filename", PS2MemoryCard.fileName),
                 E("Slot2_Enable", "false"),
             ]),
             ("EmuCore", [

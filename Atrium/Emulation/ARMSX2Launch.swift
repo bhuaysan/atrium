@@ -3,43 +3,6 @@
 import AtriumCore
 import Foundation
 
-/// Why ARMSX2 is not started for a game. Every error ARMSX2 would report
-/// itself opens a dialog, and dialogs crash it on macOS 27, so Atrium checks
-/// what it can beforehand (docs/STANDALONE_PLAN.md, S5).
-nonisolated enum StandaloneLaunchError: LocalizedError {
-    case gameUnreadable(name: String)
-    /// A format the emulator does not read: an archive, a playlist, a sheet
-    /// without a disc image it reads.
-    case unsupportedArchive(name: String)
-    case unsupportedPlaylist(name: String)
-    case unsupportedFormat(name: String)
-    case memoryCardReadOnly(URL)
-    case folderNotWritable(URL)
-    case settingsNotWritten(reason: String)
-    case stateNotLoadable
-
-    var errorDescription: String? {
-        switch self {
-        case .gameUnreadable(let name):
-            String(localized: "“\(name)” can't be read. Check its permissions in the Finder (Get Info › Sharing & Permissions), then try again.")
-        case .unsupportedArchive(let name):
-            String(localized: "ARMSX2 can't start games from archives. Unpack “\(name)” in the Finder, then rescan.")
-        case .unsupportedPlaylist(let name):
-            String(localized: "ARMSX2 can't switch the discs of a playlist. Delete “\(name)” to start each disc on its own, then rescan.")
-        case .unsupportedFormat(let name):
-            String(localized: "ARMSX2 can't read “\(name)”. It starts ISO, BIN, IMG, MDF, CHD, CSO, ZSO and GZ disc images.")
-        case .memoryCardReadOnly(let url):
-            String(localized: "The game's memory card is locked or read-only, so its saves couldn't be written: \(url.path(percentEncoded: false)).")
-        case .folderNotWritable(let url):
-            String(localized: "Atrium can't write to “\(url.path(percentEncoded: false))”. Check the folder's permissions, then try again.")
-        case .settingsNotWritten(let reason):
-            String(localized: "The emulator's settings couldn't be written. \(reason)")
-        case .stateNotLoadable:
-            String(localized: "The save state can't be loaded. It is damaged, or it was saved by a version of ARMSX2 that this one can't read.")
-        }
-    }
-}
-
 /// Everything needed to start ARMSX2 for one game, or with its own window
 /// for its settings: checked, with its settings written
 /// (docs/STANDALONE_PLAN.md, "Process and window").
@@ -112,7 +75,7 @@ nonisolated struct ARMSX2Launch: Sendable {
                 throw StandaloneLaunchError.folderNotWritable(folder)
             }
         }
-        let card = request.memoryCardFolder.appending(path: PCSX2Config.memoryCardFileName)
+        let card = request.memoryCardFolder.appending(path: PS2MemoryCard.fileName)
         if fileManager.fileExists(atPath: card.path(percentEncoded: false)),
            !fileManager.isWritableFile(atPath: card.path(percentEncoded: false)) || isLocked(card) {
             throw StandaloneLaunchError.memoryCardReadOnly(card)

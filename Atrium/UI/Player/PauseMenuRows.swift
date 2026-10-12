@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import SwiftUI
 
 /// A plain row with a highlight shape: 36 pt high, 24 pt symbol column.

@@ -2,7 +2,6 @@
 
 import Foundation
 import Testing
-@testable import Atrium
 @testable import AtriumCore
 
 nonisolated private func record(_ path: String, id: UUID = UUID(), crc: String? = nil, size: Int64 = 3) -> GameRecord {

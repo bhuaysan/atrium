@@ -287,6 +287,8 @@ Estimates are for one developer and assume the spikes don't reveal a blocker; Ph
 - Moved, unchanged apart from `public`: `GameSystem`, `SystemCatalog`, `AppPaths`, `LegacyName`, `Keychain`, `Preferences`, `Backup` (with `GameRecord`), `FileMerge`, `DebugEnvironment`, `HTTPDownload`, `ZipArchive`, `FolderStructure`, `ROMPatch`, `CoreManager`, `PS2BIOS`, `PINEClient`, `ShaderImport`, `ShaderSelection`, `SlangPresetFile`, `SlangTokenizer`. `HardwareRenderer.graphicsAPI` stays in the app (`GraphicsAPI` is a bridge type).
 - Strings: the package has its own catalog (`AtriumCore/Resources/Localizable.xcstrings`) and looks them up with `bundle: .module`; their entries moved out of the app's catalog (two the app also uses stay in both).
 - Tests: `CoreManagerTests` and `ZipRobustnessTests` moved; the shared helpers are `AtriumCoreTests/Fixtures.swift`, which `AtriumTests` compiles too. Mixed test files stay in `AtriumTests` with `@testable import AtriumCore` and move with the code they test.
+**Step 2 — saves (12 October 2026).** `BatterySave` (with `PS2MemoryCard`), `SaveStates` and `ARMSX2States` moved, and `StandaloneLaunchError` out of `ARMSX2Launch` into its own file. For that, the memory card's file name moved from `PCSX2Config` to `PS2MemoryCard.fileName`, and `StateRenderer(GraphicsAPI)` joined the app's `GraphicsAPI` mappings (`Atrium/Emulation/GraphicsAPI+Renderers.swift`). `BackupTests`, `BatterySaveTests`, `PINEClientTests` and `SaveFilesTests` moved to `AtriumCoreTests`; `armsx2StateFiles` joined the shared fixtures.
+
 - Still Apple-only inside the package, for Phase 1 (H10): `Compression` in `ZipArchive`, `Security` in `Keychain`/`LegacyName`, `zlib` imported as the SDK's module.
 
 **What holds back the rest** (found by compiling candidate sets on their own):
@@ -295,7 +297,7 @@ Estimates are for one developer and assume the spikes don't reveal a blocker; Ph
 |---|---|---|
 | Bridge types (`ShaderPreset`, `ShaderParameter`, `RetroInput`, `PadState`, `GraphicsAPI`, `AchievementClient`) | `ShaderIndex`, `ShaderPresetWriter`, `SlangPreset`, `SlangSource`, `ShaderDrafts`, `ShaderLibrary`, `ShaderWorkspace`, `InputMapping`, `InputProfile`, `HIDGamepadMapping`, `AchievementService` | `LibretroHost` in C (H1) |
 | `Game`/`PlayStatus` (SwiftData) | `DiscPlaylist`, `LibraryCollections`, `LibraryFilter`, then `LibraryScanner` (also `LibraryPaths`), `LibraryMatcher`, `GameVariants` (`TitleFormatter`) | `LibraryStore` split (H4) |
-| macOS key codes (`ARMSX2Controls`) | `PCSX2Config`, `ARMSX2Launch`; through `PCSX2Config.memoryCardFileName` also `BatterySave`, `ARMSX2States`, `SaveStates` (which also maps `GraphicsAPI`) | Key identifiers (H9); or move the constant and the `GraphicsAPI` mapping first |
+| macOS key codes (`ARMSX2Controls`) | `PCSX2Config`, `ARMSX2Launch` | Key identifiers (H9) |
 | Generated `GeneratedSecrets`, `Keychain` protocol | `Secrets`, `ScreenScraperClient` | Secret store protocol |
 
 ## Decisions

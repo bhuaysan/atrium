@@ -3255,66 +3255,6 @@
         }
       }
     },
-    "Saved with core version %@.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mit Core-Version %@ gesichert."
-          }
-        }
-      }
-    },
-    "Saved from a different version of the game file.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aus einer anderen Version der Spieldatei gesichert."
-          }
-        }
-      }
-    },
-    "State loaded. %@ If the game misbehaves, restart it.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spielstand geladen. %@ Wenn sich das Spiel seltsam verhält, starte es neu."
-          }
-        }
-      }
-    },
-    "It was probably made with another core.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Er wurde wahrscheinlich mit einem anderen Core erstellt."
-          }
-        }
-      }
-    },
-    "It was saved with core version %@; the installed version can't read it.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Er wurde mit Core-Version %@ gesichert; die installierte Version kann ihn nicht lesen."
-          }
-        }
-      }
-    },
-    "It was saved from a different version of the game file.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Er wurde aus einer anderen Version der Spieldatei gesichert."
-          }
-        }
-      }
-    },
     "Locate File…": {
       "localizations": {
         "de": {
@@ -5031,16 +4971,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Asien"
-          }
-        }
-      }
-    },
-    "Automatic State": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Automatischer Spielstand"
           }
         }
       }
@@ -10435,46 +10365,6 @@
         }
       }
     },
-    "“%@” can't be read. Check its permissions in the Finder (Get Info › Sharing & Permissions), then try again.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "„%@“ kann nicht gelesen werden. Prüfe die Zugriffsrechte im Finder (Informationen › Teilen & Zugriffsrechte) und versuche es erneut."
-          }
-        }
-      }
-    },
-    "The game's memory card is locked or read-only, so its saves couldn't be written: %@.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Die Memory Card des Spiels ist gesperrt oder schreibgeschützt, deshalb können keine Spielstände gespeichert werden: %@."
-          }
-        }
-      }
-    },
-    "Atrium can't write to “%@”. Check the folder's permissions, then try again.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Atrium kann nicht in „%@“ schreiben. Prüfe die Zugriffsrechte des Ordners und versuche es erneut."
-          }
-        }
-      }
-    },
-    "The emulator's settings couldn't be written. %@": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Die Einstellungen des Emulators konnten nicht geschrieben werden. %@"
-          }
-        }
-      }
-    },
     "%@ quit unexpectedly: %@": {
       "localizations": {
         "de": {
@@ -10575,16 +10465,6 @@
         }
       }
     },
-    "The save state can't be loaded. It is damaged, or it was saved by a version of ARMSX2 that this one can't read.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Spielstand kann nicht geladen werden. Er ist beschädigt oder wurde mit einer ARMSX2-Version gesichert, die diese nicht lesen kann."
-          }
-        }
-      }
-    },
     "Save and load in %@ while the game runs.": {
       "localizations": {
         "de": {
@@ -10641,46 +10521,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Memory Card importieren …"
-          }
-        }
-      }
-    },
-    "ARMSX2 doesn't answer right now. Try again in a moment, or save in its window.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ARMSX2 antwortet gerade nicht. Versuche es gleich noch einmal oder sichere in seinem Fenster."
-          }
-        }
-      }
-    },
-    "ARMSX2 isn't running the game yet. Try again in a moment.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ARMSX2 führt das Spiel noch nicht aus. Versuche es gleich noch einmal."
-          }
-        }
-      }
-    },
-    "ARMSX2 didn't save the state. Its window may say why, for example while the memory card is being written.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ARMSX2 hat den Spielstand nicht gesichert. Sein Fenster nennt vielleicht den Grund, etwa wenn gerade die Memory Card beschrieben wird."
-          }
-        }
-      }
-    },
-    "This state belongs to another disc of the game.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dieser Spielstand gehört zu einer anderen Disc des Spiels."
           }
         }
       }
@@ -11225,42 +11065,12 @@
         }
       }
     },
-    "software rendering": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Software-Rendering"
-          }
-        }
-      }
-    },
     "Vulkan isn’t available on this Mac, so %@ uses OpenGL.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Vulkan ist auf diesem Mac nicht verfügbar, deshalb nutzt %@ OpenGL."
-          }
-        }
-      }
-    },
-    "Saved while the game rendered with %@.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gesichert, als das Spiel mit %@ gerendert wurde."
-          }
-        }
-      }
-    },
-    "It was saved while the game rendered with %@. Switch back in Settings → Cores to load it.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Er wurde gesichert, als das Spiel mit %@ gerendert wurde. Stelle unter Einstellungen → Cores zurück, um ihn zu laden."
           }
         }
       }
@@ -11391,36 +11201,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lege jedes Spiel in den Ordner seines Systems in „ROMs“ und BIOS-Dateien in „BIOS“. Atrium nimmt sie auf, sobald sie da sind."
-          }
-        }
-      }
-    },
-    "ARMSX2 can't start games from archives. Unpack “%@” in the Finder, then rescan.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ARMSX2 kann keine Spiele aus Archiven starten. Entpacke „%@“ im Finder und scanne dann erneut."
-          }
-        }
-      }
-    },
-    "ARMSX2 can't switch the discs of a playlist. Delete “%@” to start each disc on its own, then rescan.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ARMSX2 kann die Discs einer Playlist nicht wechseln. Lösche „%@“, um jede Disc einzeln zu starten, und scanne dann erneut."
-          }
-        }
-      }
-    },
-    "ARMSX2 can't read “%@”. It starts ISO, BIN, IMG, MDF, CHD, CSO, ZSO and GZ disc images.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ARMSX2 kann „%@“ nicht lesen. Es startet Disc-Images im Format ISO, BIN, IMG, MDF, CHD, CSO, ZSO und GZ."
           }
         }
       }

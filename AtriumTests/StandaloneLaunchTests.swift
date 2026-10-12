@@ -451,7 +451,7 @@ struct StandaloneLaunchTests {
     @Test func refusesWhatWouldCrashARMSX2() throws {
         var fixture = try Fixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
-        let card = fixture.request.memoryCardFolder.appending(path: PCSX2Config.memoryCardFileName)
+        let card = fixture.request.memoryCardFolder.appending(path: PS2MemoryCard.fileName)
         try FileManager.default.createDirectory(at: fixture.request.memoryCardFolder, withIntermediateDirectories: true)
         try Data(count: 16).write(to: card)
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: card.path(percentEncoded: false))
