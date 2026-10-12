@@ -53,6 +53,10 @@ nonisolated enum PrefKey {
     static let folderStructureSystems = "folderStructureSystems"
     /// Whether the first launch has offered the folder structure.
     static let folderStructureOffered = "folderStructureOffered"
+    /// `AccentChoice` raw value, picked in Settings › Appearance.
+    static let accentColor = "accentColor"
+    /// The user's own accent as 0xRRGGBB, used by `AccentChoice.custom`.
+    static let customAccentColor = "customAccentColor"
     static func systemVideoFilter(_ systemID: String) -> String { "videoFilter.\(systemID)" }
     /// A game's own filter or preset; wins over its system's.
     static func gameVideoFilter(_ gameID: UUID) -> String { "\(gameVideoFilterPrefix)\(gameID.uuidString)" }
@@ -103,6 +107,69 @@ nonisolated enum VideoFilter: String, CaseIterable, Identifiable, Sendable {
         case .crtCurved: 5
         case .lcd: 6
         }
+    }
+}
+
+/// The app's accent colour, picked in Settings › Appearance.
+nonisolated enum AccentChoice: String, CaseIterable, Identifiable, Sendable {
+    /// The accent colour from System Settings, or Atrium blue when that is Multicolour.
+    case automatic
+    case blue, purple, pink, red, orange, yellow, green, graphite, coral
+    /// `PrefKey.customAccentColor`.
+    case custom
+
+    /// Atrium blue in Light Mode, the custom colour's starting value.
+    static let defaultCustomColor = 0x1F6BF5
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .automatic: String(localized: "Automatic")
+        case .blue: String(localized: "Blue")
+        case .purple: String(localized: "Purple")
+        case .pink: String(localized: "Pink")
+        case .red: String(localized: "Red")
+        case .orange: String(localized: "Orange")
+        case .yellow: String(localized: "Yellow")
+        case .green: String(localized: "Green")
+        case .graphite: String(localized: "Graphite")
+        case .coral: String(localized: "Coral")
+        case .custom: String(localized: "Custom")
+        }
+    }
+
+    /// The closest macOS accent colour, as System Settings stores it in
+    /// `AppleAccentColor` (-1 graphite, 0 red … 6 pink); nil for automatic.
+    func systemAccent(custom: Int) -> Int? {
+        switch self {
+        case .automatic: nil
+        case .graphite: -1
+        case .red: 0
+        case .orange: 1
+        case .yellow: 2
+        case .green: 3
+        case .blue: 4
+        case .purple: 5
+        case .pink: 6
+        case .coral: 0
+        case .custom: Self.closestSystemAccent(to: custom)
+        }
+    }
+
+    static func closestSystemAccent(to hex: Int) -> Int {
+        let r = Double((hex >> 16) & 0xFF) / 255, g = Double((hex >> 8) & 0xFF) / 255, b = Double(hex & 0xFF) / 255
+        let high = max(r, g, b), low = min(r, g, b)
+        guard high > 0, (high - low) / high >= 0.2 else { return -1 }
+        var hue = switch high {
+        case r: (g - b) / (high - low)
+        case g: 2 + (b - r) / (high - low)
+        default: 4 + (r - g) / (high - low)
+        }
+        hue = (hue * 60).truncatingRemainder(dividingBy: 360)
+        if hue < 0 { hue += 360 }
+        let hues: [(accent: Int, hue: Double)] = [(0, 0), (1, 30), (2, 55), (3, 125), (4, 215), (5, 285), (6, 330), (0, 360)]
+        return hues.min { abs($0.hue - hue) < abs($1.hue - hue) }!.accent
     }
 }
 
@@ -159,7 +226,34 @@ nonisolated enum Preferences {
             PrefKey.achievementsHardcore: false,
             PrefKey.achievementsShowsProgress: true,
             PrefKey.standaloneFullscreen: true,
+            PrefKey.accentColor: AccentChoice.automatic.rawValue,
+            PrefKey.customAccentColor: AccentChoice.defaultCustomColor,
         ])
+    }
+
+    /// AppKit draws the focused sidebar selection, table selection and focus
+    /// rings in the system accent and ignores SwiftUI's `tint`. Atrium's own
+    /// `AppleAccentColor` wins over the global one, so it gets them close to
+    /// the picked accent. AppKit reads it at launch only. Atrium blue on a
+    /// Multicolor system needs no override: that is the asset catalog's accent.
+    /// Returns whether it overrides the system accent.
+    static func applySystemAccent() -> Bool {
+        let choice = defaults.string(forKey: PrefKey.accentColor).flatMap(AccentChoice.init) ?? .automatic
+        let systemIsMulticolor = defaults.persistentDomain(forName: UserDefaults.globalDomain)?[appleAccentColor] == nil
+        if let accent = choice.systemAccent(custom: defaults.integer(forKey: PrefKey.customAccentColor)),
+           !(choice == .blue && systemIsMulticolor) {
+            defaults.set(accent, forKey: appleAccentColor)
+            return true
+        }
+        defaults.removeObject(forKey: appleAccentColor)
+        return false
+    }
+
+    private static let appleAccentColor = "AppleAccentColor"
+
+    /// The accent picked in System Settings (`AppleAccentColor`); nil for Multicolor.
+    static var globalSystemAccent: Int? {
+        defaults.persistentDomain(forName: UserDefaults.globalDomain)?[appleAccentColor] as? Int
     }
 
     static var libraryFolders: [URL] {
@@ -264,6 +358,7 @@ nonisolated enum Preferences {
         PrefKey.fastForwardSpeed, PrefKey.rewindEnabled, PrefKey.rewindBufferSize, PrefKey.runAheadFrames,
         PrefKey.turboRate, PrefKey.rumble, PrefKey.bezel, PrefKey.achievementsEnabled, PrefKey.achievementsUsername,
         PrefKey.achievementsHardcore, PrefKey.achievementsShowsProgress, PrefKey.shaderFavorites,
+        PrefKey.accentColor, PrefKey.customAccentColor,
     ]
     private static let backedUpPrefixes = ["coreChoice.", "coreOptions.", "hidGamepadMapping.", "inputProfile.", "rendererChoice.",
                                            "videoFilter."]

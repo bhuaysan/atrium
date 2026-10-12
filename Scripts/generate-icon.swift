@@ -1,6 +1,6 @@
 #!/usr/bin/env swift
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Renders the Atrium app icon (a graphite D-pad on coral) into the asset catalog and docs/icon.png.
+// Renders the Atrium app icon (a graphite D-pad on blue) into the asset catalog and docs/icon.png.
 //
 //   swift Scripts/generate-icon.swift
 
@@ -93,14 +93,14 @@ func render(size: Int) -> CGImage {
     ctx.saveGState()
     shadow(dy: 12, blur: 28, alpha: 0.32)
     ctx.addPath(body)
-    ctx.setFillColor(color(0xE5445A))
+    ctx.setFillColor(color(0x2464F0))
     ctx.fillPath()
     ctx.restoreGState()
 
     ctx.saveGState()
     ctx.addPath(body)
     ctx.clip()
-    ctx.drawLinearGradient(gradient([(0, color(0xFF8A7A)), (1, color(0xD92E4C))]),
+    ctx.drawLinearGradient(gradient([(0, color(0x5AA9FF)), (1, color(0x1846D6))]),
                            start: CGPoint(x: 512, y: 100), end: CGPoint(x: 512, y: 924), options: [])
 
     // Graphite D-pad with a drop shadow, a top gloss and a hairline edge.

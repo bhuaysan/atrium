@@ -20,7 +20,7 @@ Atrium should feel like a well-lit shelf of games inside a quiet Mac app: the bo
 2. **The shelf is the signature.** Box art already sits on a common bottom baseline inside a square slot (`GameGridView.swift:175`). Make that the recognisable trait: aligned baselines, varied box shapes, no card backgrounds behind them. RECOMMENDED
 3. **Structure through space and type, not boxes.** No rounded containers around grid items, inspector sections or settings rows beyond what native `Form` draws. Separation comes from spacing tokens (section Q) and text hierarchy. ESSENTIAL
 4. **Glass only where things float.** Liquid Glass is used for the toolbar (system), the on-cover Play button, the Player HUD and the pause panel. Never for grid items, the inspector body or nested inside another glass surface. ESSENTIAL
-5. **One accent, one meaning.** The coral accent means "interactive or selected". It is not reused for decoration, system identity or status. ESSENTIAL
+5. **One accent, one meaning.** The accent (Atrium blue unless the user picks another) means "interactive or selected". It is not reused for decoration, system identity or status. ESSENTIAL
 6. **Calm by default.** Motion is short, has no bounce, and exists only to explain a change (section O). RECOMMENDED
 7. **Native before custom.** Use `NavigationSplitView`, `.inspector`, `.searchable`, `Form`, `ContentUnavailableView`, menus and sheets as the platform draws them. Custom drawing is limited to the grid card, the system header, the Player HUD and the pause panel. ESSENTIAL
 
@@ -591,7 +591,7 @@ Colour comes from the existing `AccentColor` asset and native semantic colours; 
 
 | Role | Source | Where | Never |
 | --- | --- | --- | --- |
-| Accent (interactive, selected) | `AccentColor` asset: coral #FA5A65 light, #FF6F78 dark; users with a non-multicolour system accent get theirs | Selection ring, prominent buttons, focus highlight, links, toggles, listening state | Decoration, system identity, status |
+| Accent (interactive, selected) | `AccentColor` asset: blue #1F6BF5 light, #3D8BFF dark (coral #FA5A65/#FF6F78 until October 2026); users with a non-multicolour system accent get theirs. Settings › Appearance overrides it: views tint with `.appAccent()` and draw with `.tint`, never `Color.accentColor` (see `AppAccent.swift`) | Selection ring, prominent buttons, focus highlight, links, toggles, listening state | Decoration, system identity, status |
 | Destructive | `role: .destructive` (system red) | Remove, Delete, Quit Game | Warnings |
 | Error | `.red` on the symbol only | `xmark.octagon.fill`, missing required BIOS | Body text |
 | Warning | `.orange` on the symbol only | `exclamationmark.triangle.fill`, unknown BIOS version, failed metadata, player failure icon | Body text; `.yellow` is dropped (fails contrast on light surfaces) |

@@ -38,7 +38,7 @@ struct MenuRow: View {
             .background {
                 if isFocused {
                     RoundedRectangle(cornerRadius: AppMetrics.rowHighlightRadius, style: .continuous)
-                        .fill(Color.accentColor)
+                        .fill(.tint)
                 }
             }
             .contentShape(.rect)
@@ -203,7 +203,7 @@ struct SlotView: View {
                 if isFocused, showsFocus {
                     let inset = AppMetrics.selectionRingGap + AppMetrics.selectionRingWidth
                     RoundedRectangle(cornerRadius: radius + inset, style: .continuous)
-                        .strokeBorder(Color.accentColor, lineWidth: AppMetrics.selectionRingWidth)
+                        .strokeBorder(.tint, lineWidth: AppMetrics.selectionRingWidth)
                         .padding(-inset)
                 }
             }
@@ -266,7 +266,7 @@ struct HistoryRow: View {
         .background {
             if isFocused {
                 RoundedRectangle(cornerRadius: AppMetrics.rowHighlightRadius, style: .continuous)
-                    .fill(Color.accentColor)
+                    .fill(.tint)
             }
         }
         .contentShape(.rect)
@@ -338,7 +338,7 @@ struct AchievementRow: View {
         .background {
             if isFocused {
                 RoundedRectangle(cornerRadius: AppMetrics.rowHighlightRadius, style: .continuous)
-                    .fill(Color.accentColor)
+                    .fill(.tint)
             }
         }
         .accessibilityElement(children: .combine)

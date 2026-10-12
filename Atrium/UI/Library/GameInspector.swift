@@ -203,7 +203,7 @@ struct GameInspector: View {
 
             Button(action: actions.toggleFavorite) {
                 Image(systemName: game.isFavorite ? "heart.fill" : "heart")
-                    .foregroundStyle(game.isFavorite ? .favorite : .primary)
+                    .foregroundStyle(game.isFavorite ? AnyShapeStyle(.favorite) : AnyShapeStyle(.primary))
                     .contentTransition(.symbolEffect(.replace))
                     .modifier(RoundGlassLabel())
             }

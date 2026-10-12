@@ -31,6 +31,7 @@ struct AtriumApp: App {
 
     init() {
         Preferences.registerDefaults()
+        AccentChoice.systemAccentIsOverridden = Preferences.applySystemAccent()
         #if DEBUG
         DebugSnapshots.startIfRequested()
         #endif
@@ -72,6 +73,7 @@ struct AtriumApp: App {
         Window("Atrium", id: WindowID.library) {
             LibraryView()
                 .frame(minWidth: 820, minHeight: 520)
+                .appAccent()
         }
         .defaultSize(width: 1240, height: 800)
         .commands {
@@ -92,6 +94,7 @@ struct AtriumApp: App {
         Window(String(localized: "Player"), id: WindowID.player) {
             PlayerView()
                 .frame(minWidth: 480, minHeight: 360)
+                .appAccent()
         }
         .defaultSize(width: 1024, height: 768)
         .windowStyle(.hiddenTitleBar)
@@ -107,6 +110,7 @@ struct AtriumApp: App {
         Window(String(localized: "Shader Editor"), id: WindowID.shaderEditor) {
             ShaderEditorWindow()
                 .frame(minWidth: 960, minHeight: 600)
+                .appAccent()
         }
         .defaultSize(width: 1320, height: 880)
         .restorationBehavior(.disabled)
@@ -117,6 +121,7 @@ struct AtriumApp: App {
         WindowGroup(String(localized: "Manual"), id: WindowID.manual, for: UUID.self) { $gameID in
             ManualView(gameID: gameID)
                 .frame(minWidth: 480, minHeight: 400)
+                .appAccent()
         }
         .defaultSize(width: 760, height: 900)
         .restorationBehavior(.disabled)
@@ -126,6 +131,7 @@ struct AtriumApp: App {
             SettingsView()
                 .frame(width: 700)
                 .frame(minHeight: 440, idealHeight: 560, maxHeight: .infinity)
+                .appAccent()
         }
         .defaultSize(width: 700, height: 560)
         .environment(metadata)

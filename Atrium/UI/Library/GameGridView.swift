@@ -492,7 +492,7 @@ struct GameCard: View {
             let lineWidth = isHighContrast ? AppMetrics.highContrastSelectionRingWidth : AppMetrics.selectionRingWidth
             let inset = AppMetrics.selectionRingGap + lineWidth / 2
             RoundedRectangle(cornerRadius: radius + inset, style: .continuous)
-                .stroke(selection == .focused ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary), lineWidth: lineWidth)
+                .stroke(selection == .focused ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary), lineWidth: lineWidth)
                 .padding(-inset)
                 .allowsHitTesting(false)
         }

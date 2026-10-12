@@ -501,8 +501,8 @@ struct LibraryView: View {
     private var dropHighlight: some View {
         if isDropTargeted {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.accentColor, lineWidth: 3)
-                .background(Color.accentColor.opacity(0.08), in: .rect(cornerRadius: 12, style: .continuous))
+                .strokeBorder(.tint, lineWidth: 3)
+                .background(.tint.opacity(0.08), in: .rect(cornerRadius: 12, style: .continuous))
                 .overlay {
                     Label("Add to Library", systemImage: "plus.circle")
                         .font(.title3.weight(.semibold))

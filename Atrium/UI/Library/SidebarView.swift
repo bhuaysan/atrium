@@ -18,6 +18,7 @@ struct SidebarView: View {
     @Environment(ShaderEditor.self) private var shaderEditor
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.pickedAccent) private var pickedAccent
     @AppStorage("sidebarSystemsExpanded") private var systemsExpanded = true
     @AppStorage("sidebarCollectionsExpanded") private var collectionsExpanded = true
 
@@ -38,6 +39,7 @@ struct SidebarView: View {
                     ForEach(collections, id: \.self) { collection in
                         Label(collection, systemImage: "rectangle.stack")
                             .lineLimit(1)
+                            .listItemTint(pickedAccent.map { .fixed($0) })
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(.rect)
                             .help(collection)
@@ -100,6 +102,7 @@ struct SidebarView: View {
         Label(title, systemImage: symbol)
             .lineLimit(1)
             .badge(count ?? 0) // 0 hides the badge
+            .listItemTint(pickedAccent.map { .fixed($0) }) // the sidebar ignores `tint`
             .tag(tag)
     }
 

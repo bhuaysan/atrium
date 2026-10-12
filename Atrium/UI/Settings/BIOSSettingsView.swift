@@ -79,7 +79,7 @@ struct BIOSSettingsView: View {
         .overlay {
             if isTargeted {
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
+                    .strokeBorder(.tint, style: StrokeStyle(lineWidth: 3, dash: [8]))
                     .padding(4)
                     .allowsHitTesting(false)
             }

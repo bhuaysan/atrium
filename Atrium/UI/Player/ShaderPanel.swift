@@ -456,7 +456,7 @@ struct ParameterRow: View {
                 Spacer(minLength: AppSpacing.s)
                 Text(verbatim: Self.format(value, step: parameter.step))
                     .font(.callout.monospacedDigit())
-                    .foregroundStyle(isModified ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(isModified ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 Button("Reset Parameter", systemImage: "arrow.uturn.backward", action: reset)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)

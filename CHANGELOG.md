@@ -23,9 +23,12 @@ All notable changes to this project are documented here. The format follows
 - System banner above each system's games with the official logo and a console
   photo, and official logos on placeholder covers (downloaded from ScreenScraper
   on first use, never bundled).
+- Settings → Appearance chooses the accent colour: automatic (the system's),
+  one of nine presets or a custom colour.
 
 ### Changed
-- New app icon: a graphite D-pad on coral.
+- New app icon: a graphite D-pad on blue.
+- The accent colour is a modern blue instead of coral.
 
 ### Fixed
 - Artwork with an empty placeholder (e.g. the game logo in the inspector) never

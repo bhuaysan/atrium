@@ -22,6 +22,7 @@ struct InputBindingButton: View {
     let toggle: () -> Void
     let clear: () -> Void
     let endListening: () -> Void
+    @Environment(\.pickedAccent) private var pickedAccent
 
     var body: some View {
         HStack(spacing: AppSpacing.xs) {
@@ -38,7 +39,7 @@ struct InputBindingButton: View {
                 .frame(minWidth: 120)
             }
             .buttonStyle(.bordered)
-            .tint(isListening ? .accentColor : nil)
+            .tint(isListening ? pickedAccent ?? .accentColor : nil)
             .background {
                 if isListening { ListeningMonitor(end: endListening) }
             }

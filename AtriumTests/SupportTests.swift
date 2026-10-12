@@ -128,3 +128,20 @@ struct InputMappingTests {
         #expect(try JSONDecoder().decode(KeyboardMapping.self, from: data) == .standard)
     }
 }
+
+@Suite("Accent color")
+struct AccentColorTests {
+    @Test func presetsMapToTheirSystemAccent() {
+        #expect(AccentChoice.automatic.systemAccent(custom: 0) == nil)
+        #expect(AccentChoice.graphite.systemAccent(custom: 0) == -1)
+        #expect(AccentChoice.blue.systemAccent(custom: 0) == 4)
+        #expect(AccentChoice.pink.systemAccent(custom: 0) == 6)
+        #expect(AccentChoice.coral.systemAccent(custom: 0) == 0)
+    }
+
+    @Test(arguments: [(0x1F6BF5, 4), (0xFA5A65, 0), (0xFF9500, 1), (0xFFCC00, 2), (0x34C759, 3),
+                      (0xAF52DE, 5), (0xF74F9E, 6), (0xFF0010, 0), (0x808080, -1), (0x000000, -1)])
+    func customColorsTakeTheClosestSystemAccent(hex: Int, accent: Int) {
+        #expect(AccentChoice.custom.systemAccent(custom: hex) == accent)
+    }
+}

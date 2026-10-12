@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The Settings tabs. The selected one is stored, so other windows can open a specific tab.
 enum SettingsTab: String {
-    case general, metadata, emulation, controls, achievements, cores, bios
+    case general, appearance, metadata, emulation, controls, achievements, cores, bios
 }
 
 struct SettingsView: View {
@@ -13,6 +13,7 @@ struct SettingsView: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab("General", systemImage: "gearshape", value: .general) { GeneralSettingsView() }
+            Tab("Appearance", systemImage: "paintpalette", value: .appearance) { AppearanceSettingsView() }
             Tab("Metadata", systemImage: "text.below.photo", value: .metadata) { MetadataSettingsView() }
             Tab("Emulation", systemImage: "display", value: .emulation) { EmulationSettingsView() }
             Tab("Controls", systemImage: "gamecontroller", value: .controls) { ControlsSettingsView() }

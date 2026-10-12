@@ -43,10 +43,10 @@ nonisolated enum AppMetrics {
     static let rowHighlightRadius: CGFloat = 8
 }
 
-extension ShapeStyle where Self == Color {
+extension ShapeStyle where Self == TintShapeStyle {
     /// The favorite heart. The accent: a heart glyph and the selection ring
     /// never need to be told apart by colour.
-    static var favorite: Color { .accentColor }
+    static var favorite: TintShapeStyle { .tint }
 }
 
 extension GameSystem {
