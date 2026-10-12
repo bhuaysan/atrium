@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 @Suite("BIOS files")
 struct BIOSManagerTests {

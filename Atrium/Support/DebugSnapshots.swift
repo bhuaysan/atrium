@@ -2,6 +2,7 @@
 
 #if DEBUG
 import AppKit
+import AtriumCore
 
 /// Development aid: when `ATRIUM_SNAPSHOT_DIR` is set, all windows are
 /// written to that directory as PNG every two seconds. Handy for reviewing UI

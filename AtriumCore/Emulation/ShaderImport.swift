@@ -11,20 +11,20 @@ import Foundation
 /// holds the preset, the presets it references and their shader passes.
 /// Includes and textures outside it are neither read nor copied, links are
 /// followed before that check, and only regular files are copied.
-nonisolated enum ShaderImport {
-    struct Result: Sendable {
-        var presets: [ShaderPresetRef] = []
-        var failures: [Failure] = []
+public nonisolated enum ShaderImport {
+    public struct Result: Sendable {
+        public var presets: [ShaderPresetRef] = []
+        public var failures: [Failure] = []
         /// Files the imported presets refer to that weren't found.
-        var missing: [String] = []
+        public var missing: [String] = []
     }
 
-    struct Failure: Sendable, Hashable {
-        let name: String
-        let reason: String
+    public struct Failure: Sendable, Hashable {
+        public let name: String
+        public let reason: String
     }
 
-    static func copy(_ urls: [URL], into user: URL) -> Result {
+    public static func copy(_ urls: [URL], into user: URL) -> Result {
         var result = Result()
         let fileManager = FileManager.default
         try? fileManager.createDirectory(at: user, withIntermediateDirectories: true)
@@ -33,18 +33,18 @@ nonisolated enum ShaderImport {
             let name = url.lastPathComponent
             var isDirectory: ObjCBool = false
             guard fileManager.fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDirectory) else {
-                result.failures.append(Failure(name: name, reason: String(localized: "The file doesn't exist.")))
+                result.failures.append(Failure(name: name, reason: String(localized: "The file doesn't exist.", bundle: .module)))
                 continue
             }
             guard !url.pathComponents.starts(with: userPath) else {
-                result.failures.append(Failure(name: name, reason: String(localized: "It is already in your shaders.")))
+                result.failures.append(Failure(name: name, reason: String(localized: "It is already in your shaders.", bundle: .module)))
                 continue
             }
             do {
                 if isDirectory.boolValue {
                     let presets = presetFiles(below: url)
                     guard !presets.isEmpty else {
-                        result.failures.append(Failure(name: name, reason: String(localized: "The folder contains no shader presets (.slangp).")))
+                        result.failures.append(Failure(name: name, reason: String(localized: "The folder contains no shader presets (.slangp).", bundle: .module)))
                         continue
                     }
                     let destination = uniqueURL(for: name, in: user)
@@ -56,11 +56,11 @@ nonisolated enum ShaderImport {
                     }
                     if !skipped.isEmpty {
                         let files = skipped.joined(separator: ", ")
-                        result.failures.append(Failure(name: name, reason: String(localized: "Links to files outside the folder weren't copied: \(files)")))
+                        result.failures.append(Failure(name: name, reason: String(localized: "Links to files outside the folder weren't copied: \(files)", bundle: .module)))
                     }
                 } else if url.pathExtension.lowercased() == "slangp" {
                     guard let package = package(of: url) else {
-                        result.failures.append(Failure(name: name, reason: String(localized: "Its shaders are spread over your whole home folder or disk. Import the folder that holds them instead.")))
+                        result.failures.append(Failure(name: name, reason: String(localized: "Its shaders are spread over your whole home folder or disk. Import the folder that holds them instead.", bundle: .module)))
                         continue
                     }
                     let (preset, missing, skipped) = try copyPreset(url, from: package, into: user)
@@ -68,10 +68,10 @@ nonisolated enum ShaderImport {
                     result.missing += missing
                     if !skipped.isEmpty {
                         let files = skipped.map(\.lastPathComponent).joined(separator: ", ")
-                        result.failures.append(Failure(name: name, reason: String(localized: "Some files it refers to weren't copied, as they aren't shaders or images in its folder: \(files)")))
+                        result.failures.append(Failure(name: name, reason: String(localized: "Some files it refers to weren't copied, as they aren't shaders or images in its folder: \(files)", bundle: .module)))
                     }
                 } else {
-                    result.failures.append(Failure(name: name, reason: String(localized: "Only shader presets (.slangp) and folders can be imported.")))
+                    result.failures.append(Failure(name: name, reason: String(localized: "Only shader presets (.slangp) and folders can be imported.", bundle: .module)))
                 }
             } catch {
                 result.failures.append(Failure(name: name, reason: error.localizedDescription))
@@ -90,7 +90,7 @@ nonisolated enum ShaderImport {
     /// preset, the presets it references and their passes, as the real
     /// folder links lead to. Nil when that is the home folder or above, or a
     /// whole volume: then it would let the preset take along almost anything.
-    static func package(of preset: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL? {
+    public static func package(of preset: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL? {
         let files = SlangPresetFile.presetsAndPasses(of: preset)
         let folder = URL(filePath: NSString.path(withComponents: commonDirectory(of: files)), directoryHint: .isDirectory)
             .resolvingSymlinksInPath()

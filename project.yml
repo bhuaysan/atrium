@@ -26,6 +26,11 @@ settings:
     CODE_SIGN_IDENTITY: "-"
     DEVELOPMENT_TEAM: ""
 
+# Package.swift: AtriumCore, the code the Linux port shares (docs/LINUX_PLAN.md).
+packages:
+  Atrium:
+    path: .
+
 targets:
   Atrium:
     type: application
@@ -70,6 +75,8 @@ targets:
         LOCALIZATION_PREFERS_STRING_CATALOGS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
     dependencies:
+      - package: Atrium
+        product: AtriumCore
       # RetroArch slang shaders (MPL-2.0), fetched by Scripts/fetch-librashader.sh;
       # see ThirdParty/librashader/README.md.
       - framework: ThirdParty/librashader/lib/librashader.dylib
@@ -113,6 +120,8 @@ targets:
     platform: macOS
     sources:
       - path: AtriumTests
+      # Helpers shared with the package's tests.
+      - path: AtriumCoreTests/Fixtures.swift
     dependencies:
       - target: Atrium
       # Loaded with dlopen like a downloaded core, so copied, not linked.
@@ -188,6 +197,7 @@ schemes:
       config: Debug
       targets:
         - AtriumTests
+        - package: Atrium/AtriumCoreTests
     profile:
       config: Release
     archive:

@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 private actor DownloadLog {
     private(set) var urls: [URL] = []

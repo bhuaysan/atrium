@@ -5,10 +5,10 @@ import Security
 
 /// Minimal generic-password Keychain wrapper for the optional ScreenScraper
 /// user account password.
-nonisolated enum Keychain {
-    static let service = "io.github.bhuaysan.Atrium"
+public nonisolated enum Keychain {
+    public static let service = "io.github.bhuaysan.Atrium"
 
-    static func password(for account: String) -> String? {
+    public static func password(for account: String) -> String? {
         guard !account.isEmpty else { return nil }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -23,7 +23,7 @@ nonisolated enum Keychain {
         return String(data: data, encoding: .utf8)
     }
 
-    static func setPassword(_ password: String?, for account: String) {
+    public static func setPassword(_ password: String?, for account: String) {
         guard !account.isEmpty else { return }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

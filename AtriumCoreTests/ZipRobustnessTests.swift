@@ -2,7 +2,7 @@
 
 import Foundation
 import Testing
-@testable import Atrium
+@testable import AtriumCore
 
 /// Builds a one-entry ZIP by hand so the central directory can be made malformed.
 private func handmadeZip(centralExtra: [UInt8], sentinelSizes: Bool) -> Data {

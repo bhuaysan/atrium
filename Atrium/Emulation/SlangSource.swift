@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import Foundation
 
 /// What the shader editor reads from `.slang` source itself: declared

@@ -4,6 +4,7 @@ import Darwin
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// A PINE server on a Unix socket that answers like ARMSX2: one connection at
 /// a time, framed requests, a result byte and the payload.

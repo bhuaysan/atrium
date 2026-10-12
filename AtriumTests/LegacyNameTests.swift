@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// What Atrium takes over from the time it was called Ursprung.
 @Suite("Legacy name")

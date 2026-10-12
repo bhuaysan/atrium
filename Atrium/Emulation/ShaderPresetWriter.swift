@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import Foundation
 
 /// Saves changed parameters as a RetroArch "simple preset": a `.slangp`

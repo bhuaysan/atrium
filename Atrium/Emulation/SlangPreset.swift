@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import Foundation
 
 /// A RetroArch `.slangp` preset as the shader editor edits it: passes with

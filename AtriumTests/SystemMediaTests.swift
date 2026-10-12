@@ -5,6 +5,7 @@ import Foundation
 import ImageIO
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 @Suite("System media")
 struct SystemMediaTests {

@@ -3,84 +3,84 @@
 import Foundation
 
 /// libretro cores known to work on macOS / Apple Silicon.
-nonisolated enum Cores {
+public nonisolated enum Cores {
     private static let assets = URL(string: "https://buildbot.libretro.com/assets/system/")!
 
-    static let fceumm = CoreDefinition(id: "fceumm", name: "FCEUmm")
-    static let nestopia = CoreDefinition(id: "nestopia", name: "Nestopia UE")
-    static let mesen = CoreDefinition(id: "mesen", name: "Mesen")
-    static let snes9x = CoreDefinition(id: "snes9x", name: "Snes9x")
-    static let bsnes = CoreDefinition(id: "bsnes", name: "bsnes")
-    static let mesen2 = CoreDefinition(id: "mesen2", name: "Mesen 2")
+    public static let fceumm = CoreDefinition(id: "fceumm", name: "FCEUmm")
+    public static let nestopia = CoreDefinition(id: "nestopia", name: "Nestopia UE")
+    public static let mesen = CoreDefinition(id: "mesen", name: "Mesen")
+    public static let snes9x = CoreDefinition(id: "snes9x", name: "Snes9x")
+    public static let bsnes = CoreDefinition(id: "bsnes", name: "bsnes")
+    public static let mesen2 = CoreDefinition(id: "mesen2", name: "Mesen 2")
     // Mupen64Plus-Next renders with paraLLEl-RDP (accurate, on the GPU)
     // through Vulkan. Without Vulkan, N64 cores use the accurate software RDP
     // (angrylion): GLideN64's frame buffer emulation renders black on Apple's
     // OpenGL. The macOS build of ParaLLEl N64 has no paraLLEl-RDP.
-    static let mupen64plusNext = CoreDefinition(id: "mupen64plus_next", name: "Mupen64Plus-Next",
-                                                optionDefaults: ["mupen64plus-rdp-plugin": "angrylion"],
-                                                renderer: .vulkan,
-                                                vulkanOptionDefaults: ["mupen64plus-rdp-plugin": "parallel",
-                                                                       "mupen64plus-rsp-plugin": "parallel"])
-    static let parallelN64 = CoreDefinition(id: "parallel_n64", name: "ParaLLEl N64",
-                                            optionDefaults: ["parallel-n64-gfxplugin": "angrylion"])
-    static let gambatte = CoreDefinition(id: "gambatte", name: "Gambatte")
-    static let sameboy = CoreDefinition(id: "sameboy", name: "SameBoy")
-    static let mgba = CoreDefinition(id: "mgba", name: "mGBA")
-    static let vbaNext = CoreDefinition(id: "vba_next", name: "VBA Next")
-    static let melondsds = CoreDefinition(id: "melondsds", name: "melonDS DS")
-    static let desmume = CoreDefinition(id: "desmume", name: "DeSmuME")
+    public static let mupen64plusNext = CoreDefinition(id: "mupen64plus_next", name: "Mupen64Plus-Next",
+                                                       optionDefaults: ["mupen64plus-rdp-plugin": "angrylion"],
+                                                       renderer: .vulkan,
+                                                       vulkanOptionDefaults: ["mupen64plus-rdp-plugin": "parallel",
+                                                                              "mupen64plus-rsp-plugin": "parallel"])
+    public static let parallelN64 = CoreDefinition(id: "parallel_n64", name: "ParaLLEl N64",
+                                                   optionDefaults: ["parallel-n64-gfxplugin": "angrylion"])
+    public static let gambatte = CoreDefinition(id: "gambatte", name: "Gambatte")
+    public static let sameboy = CoreDefinition(id: "sameboy", name: "SameBoy")
+    public static let mgba = CoreDefinition(id: "mgba", name: "mGBA")
+    public static let vbaNext = CoreDefinition(id: "vba_next", name: "VBA Next")
+    public static let melondsds = CoreDefinition(id: "melondsds", name: "melonDS DS")
+    public static let desmume = CoreDefinition(id: "desmume", name: "DeSmuME")
     // Dolphin's OpenGL backend needs more than Apple's OpenGL 4.1 offers.
-    static let dolphin = CoreDefinition(id: "dolphin", name: "Dolphin", renderer: .vulkan, vulkanOptionDefaults: [:],
-                                        systemAssets: assets.appending(path: "Dolphin.zip"), experimental: true)
-    static let beetleVB = CoreDefinition(id: "mednafen_vb", name: "Beetle VB")
-    static let genesisPlusGX = CoreDefinition(id: "genesis_plus_gx", name: "Genesis Plus GX")
-    static let picodrive = CoreDefinition(id: "picodrive", name: "PicoDrive")
-    static let blastem = CoreDefinition(id: "blastem", name: "BlastEm")
-    static let gearsystem = CoreDefinition(id: "gearsystem", name: "Gearsystem")
-    static let beetleSaturn = CoreDefinition(id: "mednafen_saturn", name: "Beetle Saturn")
-    static let yabause = CoreDefinition(id: "yabause", name: "Yabause")
+    public static let dolphin = CoreDefinition(id: "dolphin", name: "Dolphin", renderer: .vulkan, vulkanOptionDefaults: [:],
+                                               systemAssets: assets.appending(path: "Dolphin.zip"), experimental: true)
+    public static let beetleVB = CoreDefinition(id: "mednafen_vb", name: "Beetle VB")
+    public static let genesisPlusGX = CoreDefinition(id: "genesis_plus_gx", name: "Genesis Plus GX")
+    public static let picodrive = CoreDefinition(id: "picodrive", name: "PicoDrive")
+    public static let blastem = CoreDefinition(id: "blastem", name: "BlastEm")
+    public static let gearsystem = CoreDefinition(id: "gearsystem", name: "Gearsystem")
+    public static let beetleSaturn = CoreDefinition(id: "mednafen_saturn", name: "Beetle Saturn")
+    public static let yabause = CoreDefinition(id: "yabause", name: "Yabause")
     // Per-pixel alpha sorting exists only in Flycast's Vulkan renderer on macOS.
-    static let flycast = CoreDefinition(id: "flycast", name: "Flycast", renderer: .vulkan, vulkanOptionDefaults: [:])
-    static let pcsxRearmed = CoreDefinition(id: "pcsx_rearmed", name: "PCSX ReARMed")
-    static let swanstation = CoreDefinition(id: "swanstation", name: "SwanStation", renderer: .vulkan,
-                                            vulkanOptionDefaults: ["swanstation_GPU_Renderer": "Vulkan"])
-    static let beetlePSX = CoreDefinition(id: "mednafen_psx", name: "Beetle PSX")
-    static let beetlePSXHW = CoreDefinition(id: "mednafen_psx_hw", name: "Beetle PSX HW", renderer: .vulkan,
-                                            vulkanOptionDefaults: ["beetle_psx_hw_renderer": "hardware_vk"])
-    static let ppsspp = CoreDefinition(id: "ppsspp", name: "PPSSPP", vulkanOptionDefaults: [:],
-                                       systemAssets: assets.appending(path: "PPSSPP.zip"))
-    static let beetlePCEFast = CoreDefinition(id: "mednafen_pce_fast", name: "Beetle PCE Fast")
-    static let beetleSuperGrafx = CoreDefinition(id: "mednafen_supergrafx", name: "Beetle SuperGrafx")
-    static let stella = CoreDefinition(id: "stella", name: "Stella")
-    static let a5200 = CoreDefinition(id: "a5200", name: "a5200")
-    static let atari800 = CoreDefinition(id: "atari800", name: "Atari800")
-    static let prosystem = CoreDefinition(id: "prosystem", name: "ProSystem")
-    static let handy = CoreDefinition(id: "handy", name: "Handy")
-    static let beetleLynx = CoreDefinition(id: "mednafen_lynx", name: "Beetle Lynx")
-    static let virtualJaguar = CoreDefinition(id: "virtualjaguar", name: "Virtual Jaguar")
-    static let beetleNGP = CoreDefinition(id: "mednafen_ngp", name: "Beetle NeoPop")
-    static let beetleWSwan = CoreDefinition(id: "mednafen_wswan", name: "Beetle Cygne")
-    static let gearcoleco = CoreDefinition(id: "gearcoleco", name: "Gearcoleco")
-    static let freeintv = CoreDefinition(id: "freeintv", name: "FreeIntv")
-    static let vecx = CoreDefinition(id: "vecx", name: "vecx")
-    static let fbneo = CoreDefinition(id: "fbneo", name: "FinalBurn Neo")
-    static let mame2003Plus = CoreDefinition(id: "mame2003_plus", name: "MAME 2003-Plus")
-    static let opera = CoreDefinition(id: "opera", name: "Opera")
-    static let bluemsx = CoreDefinition(id: "bluemsx", name: "blueMSX", systemAssets: assets.appending(path: "blueMSX.zip"))
-    static let fmsx = CoreDefinition(id: "fmsx", name: "fMSX")
-    static let pokemini = CoreDefinition(id: "pokemini", name: "PokeMini")
+    public static let flycast = CoreDefinition(id: "flycast", name: "Flycast", renderer: .vulkan, vulkanOptionDefaults: [:])
+    public static let pcsxRearmed = CoreDefinition(id: "pcsx_rearmed", name: "PCSX ReARMed")
+    public static let swanstation = CoreDefinition(id: "swanstation", name: "SwanStation", renderer: .vulkan,
+                                                   vulkanOptionDefaults: ["swanstation_GPU_Renderer": "Vulkan"])
+    public static let beetlePSX = CoreDefinition(id: "mednafen_psx", name: "Beetle PSX")
+    public static let beetlePSXHW = CoreDefinition(id: "mednafen_psx_hw", name: "Beetle PSX HW", renderer: .vulkan,
+                                                   vulkanOptionDefaults: ["beetle_psx_hw_renderer": "hardware_vk"])
+    public static let ppsspp = CoreDefinition(id: "ppsspp", name: "PPSSPP", vulkanOptionDefaults: [:],
+                                              systemAssets: assets.appending(path: "PPSSPP.zip"))
+    public static let beetlePCEFast = CoreDefinition(id: "mednafen_pce_fast", name: "Beetle PCE Fast")
+    public static let beetleSuperGrafx = CoreDefinition(id: "mednafen_supergrafx", name: "Beetle SuperGrafx")
+    public static let stella = CoreDefinition(id: "stella", name: "Stella")
+    public static let a5200 = CoreDefinition(id: "a5200", name: "a5200")
+    public static let atari800 = CoreDefinition(id: "atari800", name: "Atari800")
+    public static let prosystem = CoreDefinition(id: "prosystem", name: "ProSystem")
+    public static let handy = CoreDefinition(id: "handy", name: "Handy")
+    public static let beetleLynx = CoreDefinition(id: "mednafen_lynx", name: "Beetle Lynx")
+    public static let virtualJaguar = CoreDefinition(id: "virtualjaguar", name: "Virtual Jaguar")
+    public static let beetleNGP = CoreDefinition(id: "mednafen_ngp", name: "Beetle NeoPop")
+    public static let beetleWSwan = CoreDefinition(id: "mednafen_wswan", name: "Beetle Cygne")
+    public static let gearcoleco = CoreDefinition(id: "gearcoleco", name: "Gearcoleco")
+    public static let freeintv = CoreDefinition(id: "freeintv", name: "FreeIntv")
+    public static let vecx = CoreDefinition(id: "vecx", name: "vecx")
+    public static let fbneo = CoreDefinition(id: "fbneo", name: "FinalBurn Neo")
+    public static let mame2003Plus = CoreDefinition(id: "mame2003_plus", name: "MAME 2003-Plus")
+    public static let opera = CoreDefinition(id: "opera", name: "Opera")
+    public static let bluemsx = CoreDefinition(id: "bluemsx", name: "blueMSX", systemAssets: assets.appending(path: "blueMSX.zip"))
+    public static let fmsx = CoreDefinition(id: "fmsx", name: "fMSX")
+    public static let pokemini = CoreDefinition(id: "pokemini", name: "PokeMini")
 
     // MARK: Standalone emulators
 
     /// PlayStation 2 through ARMSX2's macOS build: no libretro core runs PS2
     /// games on Apple Silicon (docs/STANDALONE_PLAN.md).
-    static let armsx2 = CoreDefinition(id: StandaloneEmulator.armsx2.id, name: StandaloneEmulator.armsx2.name,
-                                       backend: .standalone(.armsx2))
+    public static let armsx2 = CoreDefinition(id: StandaloneEmulator.armsx2.id, name: StandaloneEmulator.armsx2.name,
+                                              backend: .standalone(.armsx2))
 }
 
 nonisolated extension StandaloneEmulator {
     /// Tested with the checklist in docs/STANDALONE_PLAN.md ("Spike results").
-    static let armsx2 = StandaloneEmulator(
+    public static let armsx2 = StandaloneEmulator(
         id: "armsx2", name: "ARMSX2", repository: "ARMSX2/ARMSX2",
         release: Release(tag: "nightly-20261006", assetName: "ARMSX2-nightly-20261006-46c06fe7ca-macOS-arm64.tar.xz",
                          sha256: "cfb15cb8c220de7172bcdb3a73f63fae6700b240bb2d671c93df574247e5fc8e",
@@ -88,8 +88,8 @@ nonisolated extension StandaloneEmulator {
         teamIdentifier: "L296QD7JFU", executable: "Contents/MacOS/ARMSX2", saveStateVersion: 0x9A59_0000)
 }
 
-nonisolated enum SystemCatalog {
-    static let all: [GameSystem] = [
+public nonisolated enum SystemCatalog {
+    public static let all: [GameSystem] = [
         // MARK: Nintendo
         GameSystem(id: "nes", name: "Nintendo Entertainment System", shortName: "NES", manufacturer: "Nintendo", year: 1983,
                    kind: .console, screenScraperID: 3, extensions: ["nes", "unf", "unif"],
@@ -135,7 +135,7 @@ nonisolated enum SystemCatalog {
                    folderAliases: ["gba", "gameboyadvance"],
                    cores: [Cores.mgba, Cores.vbaNext],
                    bios: [BIOSFile(fileName: "gba_bios.bin", md5: "a860e8c0b6d573d191e4ec7db1b1e4f6", required: false,
-                                   note: String(localized: "Improves accuracy."))],
+                                   note: String(localized: "Improves accuracy.", bundle: .module))],
                    accent: 0x3F3FA8, boxAspect: 1.0),
         GameSystem(id: "nds", name: "Nintendo DS", shortName: "NDS", manufacturer: "Nintendo", year: 2004,
                    kind: .handheld, screenScraperID: 15, extensions: ["nds", "dsi", "ids"],
@@ -195,7 +195,7 @@ nonisolated enum SystemCatalog {
                    folderAliases: ["dc", "dreamcast", "segadreamcast"],
                    cores: [Cores.flycast],
                    bios: [BIOSFile(fileName: "dc/dc_boot.bin", md5: "e10c53c2f8b90bab96ead2d368858623", required: false,
-                                   note: String(localized: "Flycast includes an HLE BIOS.")),
+                                   note: String(localized: "Flycast includes an HLE BIOS.", bundle: .module)),
                           BIOSFile(fileName: "dc/dc_flash.bin", md5: "0a93f7940c455905bea6e392dfde92a4", required: false)],
                    accent: 0xE35205, boxAspect: 1.0),
 
@@ -324,20 +324,20 @@ nonisolated enum SystemCatalog {
                    folderAliases: ["arcade", "mame", "fbneo", "fba", "finalburn", "cps1", "cps2", "cps3", "neogeo", "mame2003"],
                    cores: [Cores.fbneo, Cores.mame2003Plus],
                    bios: [BIOSFile(fileName: "fbneo/neogeo.zip", md5: nil, required: false,
-                                   note: String(localized: "Required for Neo Geo games."))],
+                                   note: String(localized: "Required for Neo Geo games.", bundle: .module))],
                    archivesAreNative: true, accent: 0xB7950B, boxAspect: 0.75),
     ]
 
     private static let byID: [String: GameSystem] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
 
-    static func system(withID id: String) -> GameSystem? { byID[id] }
+    public static func system(withID id: String) -> GameSystem? { byID[id] }
 
     /// Extensions that are shared by several disc/cartridge systems and need
     /// the folder name to be resolved.
-    static let ambiguousExtensions: Set<String> = ["bin", "iso", "cue", "chd", "img", "m3u", "zip", "7z", "rom", "mdf", "toc", "ccd", "pbp"]
+    public static let ambiguousExtensions: Set<String> = ["bin", "iso", "cue", "chd", "img", "m3u", "zip", "7z", "rom", "mdf", "toc", "ccd", "pbp"]
 
     /// Systems a game with the given extension could belong to.
-    static func candidates(forExtension ext: String) -> [GameSystem] {
+    public static func candidates(forExtension ext: String) -> [GameSystem] {
         let ext = ext.lowercased()
         if let exact = extensionIndex[ext] { return exact }
         switch ext {
@@ -355,11 +355,11 @@ nonisolated enum SystemCatalog {
     }
 
     /// Systems whose games are commonly stored as disc images.
-    static let discSystems: Set<String> = ["psx", "psp", "ps2", "segacd", "saturn", "dreamcast", "pcecd", "3do", "gamecube", "wii"]
+    public static let discSystems: Set<String> = ["psx", "psp", "ps2", "segacd", "saturn", "dreamcast", "pcecd", "3do", "gamecube", "wii"]
 
     /// Cartridge systems whose ROMs Atrium can patch (IPS, UPS, BPS):
     /// not disc images, and not arcade sets, which cores read as archives.
-    static func supportsPatches(_ system: GameSystem) -> Bool {
+    public static func supportsPatches(_ system: GameSystem) -> Bool {
         !discSystems.contains(system.id) && !system.archivesAreNative
     }
 
@@ -374,7 +374,7 @@ nonisolated enum SystemCatalog {
     /// The folder each system gets in the folder structure (`FolderStructure`).
     /// Every name leads back to its system through the alias table (checked
     /// by a test) and is the same in every language.
-    static let folderNames: [String: String] = [
+    public static let folderNames: [String: String] = [
         "nes": "NES", "fds": "Famicom Disk System", "snes": "Super Nintendo", "n64": "Nintendo 64",
         "gamecube": "GameCube", "wii": "Wii", "gb": "Game Boy", "gbc": "Game Boy Color", "gba": "Game Boy Advance",
         "nds": "Nintendo DS", "virtualboy": "Virtual Boy", "pokemini": "Pokémon mini",
@@ -389,7 +389,7 @@ nonisolated enum SystemCatalog {
     ]
 
     /// Maps a folder name to a system via the alias table.
-    static func system(forFolderName name: String) -> GameSystem? {
+    public static func system(forFolderName name: String) -> GameSystem? {
         let normalized = normalize(name)
         return aliasIndex[normalized]
     }
@@ -403,7 +403,7 @@ nonisolated enum SystemCatalog {
         return index
     }()
 
-    static func normalize(_ name: String) -> String {
+    public static func normalize(_ name: String) -> String {
         name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
             .filter { $0.isLetter || $0.isNumber }
     }

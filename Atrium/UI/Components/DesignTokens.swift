@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import SwiftUI
 
 /// Spacing on a 4 pt grid. See docs/DESIGN_SPEC.md, section Q.

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import SwiftUI
 
 /// The inspector while several games are selected: what they have in

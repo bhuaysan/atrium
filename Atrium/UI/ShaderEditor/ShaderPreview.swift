@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import AppKit
+import AtriumCore
 import MetalKit
 import SwiftUI
 import UniformTypeIdentifiers

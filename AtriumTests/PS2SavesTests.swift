@@ -5,6 +5,7 @@ import Foundation
 import ImageIO
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// A solid PNG, standing in for the screenshot ARMSX2 stores in a state.
 nonisolated private func png(width: Int, height: Int) -> Data {

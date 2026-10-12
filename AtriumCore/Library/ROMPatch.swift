@@ -8,17 +8,17 @@ import Foundation
 /// Supported formats: IPS, UPS and BPS. UPS and BPS carry checksums of the
 /// ROM they expect, so a patch for another revision is refused instead of
 /// producing a broken game.
-nonisolated enum ROMPatch {
-    enum Format: String, Sendable {
+public nonisolated enum ROMPatch {
+    public enum Format: String, Sendable {
         case ips, ups, bps
 
-        var title: String { rawValue.uppercased() }
+        public var title: String { rawValue.uppercased() }
 
         /// File extensions of patches Atrium can apply.
-        static let fileExtensions: Set<String> = ["ips", "ups", "bps"]
+        public static let fileExtensions: Set<String> = ["ips", "ups", "bps"]
     }
 
-    enum PatchError: LocalizedError, Equatable {
+    public enum PatchError: LocalizedError, Equatable {
         case unknownFormat
         case damaged
         /// The patch is for another ROM (checksum of the original differs).
@@ -26,21 +26,21 @@ nonisolated enum ROMPatch {
         /// The result does not match the checksum the patch promises.
         case wrongResult
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .unknownFormat:
-                String(localized: "This isn't an IPS, UPS or BPS patch.")
+                String(localized: "This isn't an IPS, UPS or BPS patch.", bundle: .module)
             case .damaged:
-                String(localized: "The patch file is damaged.")
+                String(localized: "The patch file is damaged.", bundle: .module)
             case .wrongROM(let expected, let found):
-                String(localized: "The patch is made for another version of the game (CRC32 \(Checksum.hex(expected)), this file has \(Checksum.hex(found))).")
+                String(localized: "The patch is made for another version of the game (CRC32 \(Checksum.hex(expected)), this file has \(Checksum.hex(found))).", bundle: .module)
             case .wrongResult:
-                String(localized: "Patching produced a different result than the patch expects.")
+                String(localized: "Patching produced a different result than the patch expects.", bundle: .module)
             }
         }
     }
 
-    static func format(of patch: Data) -> Format? {
+    public static func format(of patch: Data) -> Format? {
         if patch.starts(with: Array("PATCH".utf8)) { return .ips }
         if patch.starts(with: Array("UPS1".utf8)) { return .ups }
         if patch.starts(with: Array("BPS1".utf8)) { return .bps }
@@ -48,7 +48,7 @@ nonisolated enum ROMPatch {
     }
 
     /// The ROM `patch` turns `rom` into.
-    static func apply(_ patch: Data, to rom: Data) throws -> Data {
+    public static func apply(_ patch: Data, to rom: Data) throws -> Data {
         let patch = [UInt8](patch)
         let rom = [UInt8](rom)
         let result: [UInt8] = switch format(of: Data(patch)) {
@@ -62,7 +62,7 @@ nonisolated enum ROMPatch {
 
     /// Checks whether `patch` fits `rom` without patching: UPS and BPS
     /// compare the ROM's checksum; IPS has none and always fits.
-    static func check(_ patch: Data, for rom: Data) throws {
+    public static func check(_ patch: Data, for rom: Data) throws {
         let bytes = [UInt8](patch)
         switch format(of: patch) {
         case .ips:
@@ -79,7 +79,7 @@ nonisolated enum ROMPatch {
 
     /// The CRC32 of the ROM a UPS or BPS patch is made for; nil for IPS,
     /// which records none.
-    static func expectedSourceCRC(_ patch: Data) -> UInt32? {
+    public static func expectedSourceCRC(_ patch: Data) -> UInt32? {
         guard let format = format(of: patch), format != .ips, patch.count >= 16 else { return nil }
         return uint32LE([UInt8](patch.suffix(12).prefix(4)), at: 0)
     }

@@ -4,17 +4,23 @@ import Foundation
 
 /// Combines files without losing any: used when saves of two library entries
 /// come together and when a backup is restored over existing data.
-nonisolated enum FileMerge {
-    struct Report: Sendable, Equatable {
+public nonisolated enum FileMerge {
+    public struct Report: Sendable, Equatable {
         /// Files that had no counterpart at the destination.
-        var added = 0
+        public var added = 0
         /// Files whose counterpart had the same contents.
-        var identical = 0
+        public var identical = 0
         /// Files that differed from their counterpart. The newer one is in
         /// place; the older one is kept next to it under a labelled name.
-        var conflicts = 0
+        public var conflicts = 0
 
-        static func + (lhs: Report, rhs: Report) -> Report {
+        public init(added: Int = 0, identical: Int = 0, conflicts: Int = 0) {
+            self.added = added
+            self.identical = identical
+            self.conflicts = conflicts
+        }
+
+        public static func + (lhs: Report, rhs: Report) -> Report {
             Report(added: lhs.added + rhs.added, identical: lhs.identical + rhs.identical,
                    conflicts: lhs.conflicts + rhs.conflicts)
         }
@@ -23,16 +29,21 @@ nonisolated enum FileMerge {
     /// Names for the older file of a conflict, e.g. "before restore
     /// 2026-10-03 14.22" for the file that was there and "from backup …" for
     /// the incoming one.
-    struct Labels: Sendable {
-        let existing: String
-        let incoming: String
+    public struct Labels: Sendable {
+        public let existing: String
+        public let incoming: String
+
+        public init(existing: String, incoming: String) {
+            self.existing = existing
+            self.incoming = incoming
+        }
     }
 
     /// Puts `source` at `destination`. Nothing that exists is overwritten:
     /// identical contents are left alone; otherwise the newer file (by
     /// modification date) ends up at `destination` and the older one next to
     /// it as "<name> (<label>).<extension>".
-    static func place(_ source: URL, at destination: URL, moving: Bool, labels: Labels) throws -> Report {
+    public static func place(_ source: URL, at destination: URL, moving: Bool, labels: Labels) throws -> Report {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         let transfer = { (from: URL, to: URL) throws in
@@ -59,8 +70,8 @@ nonisolated enum FileMerge {
     /// Places every file below `source` at the same relative path below
     /// `destination`. `mapComponent` can rewrite path components, e.g. to
     /// give a game's folder its new ID.
-    static func mergeDirectory(_ source: URL, into destination: URL, moving: Bool, labels: Labels,
-                               mapComponent: (String) -> String = { $0 }) throws -> Report {
+    public static func mergeDirectory(_ source: URL, into destination: URL, moving: Bool, labels: Labels,
+                                      mapComponent: (String) -> String = { $0 }) throws -> Report {
         var report = Report()
         for (file, components) in files(below: source) {
             var target = destination
@@ -72,7 +83,7 @@ nonisolated enum FileMerge {
     }
 
     /// Regular files below `directory` with their path components relative to it.
-    static func files(below directory: URL) -> [(url: URL, components: [String])] {
+    public static func files(below directory: URL) -> [(url: URL, components: [String])] {
         let base = directory.standardizedFileURL.pathComponents
         guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey]) else { return [] }
         var files: [(URL, [String])] = []
@@ -85,7 +96,7 @@ nonisolated enum FileMerge {
     }
 
     /// A label with the current date and time for `Labels`.
-    static func stamp(_ date: Date = .now) -> String {
+    public static func stamp(_ date: Date = .now) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
@@ -94,7 +105,7 @@ nonisolated enum FileMerge {
 
     /// Whether `url` is the older file of a conflict, kept under a labelled
     /// name. Recognised by the date and time `stamp()` puts into every label.
-    static func isLabelledCopy(_ url: URL) -> Bool {
+    public static func isLabelledCopy(_ url: URL) -> Bool {
         url.deletingPathExtension().lastPathComponent
             .contains(#/ \([^()]*\d{4}-\d{2}-\d{2} \d{2}\.\d{2}\.\d{2}( \d+)?\)$/#)
     }
@@ -104,7 +115,7 @@ nonisolated enum FileMerge {
     }
 
     /// "<name> (<label>).<ext>", numbered if that is taken too.
-    static func available(_ url: URL, label: String) -> URL {
+    public static func available(_ url: URL, label: String) -> URL {
         let directory = url.deletingLastPathComponent()
         let ext = url.pathExtension
         let stem = url.deletingPathExtension().lastPathComponent

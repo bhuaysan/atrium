@@ -4,6 +4,7 @@ import AppKit
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 @Suite("Input routing")
 struct InputRoutingTests {

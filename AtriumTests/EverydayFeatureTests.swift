@@ -4,6 +4,7 @@ import Foundation
 import SwiftData
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 private func makeContext() throws -> (ModelContainer, ModelContext) {
     let container = try ModelContainer.library(configuration: ModelConfiguration(isStoredInMemoryOnly: true))

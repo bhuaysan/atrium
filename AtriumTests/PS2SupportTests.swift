@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// A 4 MB image with a minimal ROM directory: `RESET` (the directory's
 /// offset), `ROMDIR` (the directory itself) and `ROMVER` right after it.

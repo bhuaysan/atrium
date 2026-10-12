@@ -1,6 +1,6 @@
 # Atrium on Linux: Plan
 
-12 October 2026 · based on commit 614ed53 (main). Status: decisions D1–D7 made (12 October 2026, see *Decisions* at the end); next is Phase 0. No code yet.
+12 October 2026 · based on commit 614ed53 (main). Status: decisions D1–D7 made (12 October 2026, see *Decisions* at the end); Phase 0 started: `Package.swift` with `AtriumCore` exists (see *Phase 0 progress*).
 
 Atrium is a macOS app through and through: SwiftUI and SwiftData for the library, AppKit in a third of the views, Metal for presentation, an Objective-C libretro host, CGL and MoltenVK for hardware rendering, AVAudioEngine, GameController/IOKit for input. This plan describes how Atrium can also run on Linux without forking it into two products, what stands in the way, and in which order to do it.
 
@@ -279,6 +279,24 @@ Backups (`manifest.json`, `library.json` with `GameRecord`s, `settings.plist`, s
 | **6 — Release** | Flatpak manifest, AppStream metainfo, desktop file, icons, CI artefacts, Steam Deck check, README/docs (`SUPPORTED_SYSTEMS.md` per platform), release notes | Installs and runs on Fedora, Ubuntu 24.04 and SteamOS from the Flatpak | 2–3 weeks |
 
 Estimates are for one developer and assume the spikes don't reveal a blocker; Phase 3 depends most on the UI binding choice (D2).
+
+### Phase 0 progress
+
+**Step 1 — package (12 October 2026).** `Package.swift` at the root with the library `AtriumCore` (`AtriumCore/`) and its tests (`AtriumCoreTests/`). The app links it through `packages:` in `project.yml`; the Atrium scheme runs the package's tests with the app's, and `swift test` runs them alone. Swift settings match the app target (main actor default isolation, approachable concurrency, member import visibility).
+
+- Moved, unchanged apart from `public`: `GameSystem`, `SystemCatalog`, `AppPaths`, `LegacyName`, `Keychain`, `Preferences`, `Backup` (with `GameRecord`), `FileMerge`, `DebugEnvironment`, `HTTPDownload`, `ZipArchive`, `FolderStructure`, `ROMPatch`, `CoreManager`, `PS2BIOS`, `PINEClient`, `ShaderImport`, `ShaderSelection`, `SlangPresetFile`, `SlangTokenizer`. `HardwareRenderer.graphicsAPI` stays in the app (`GraphicsAPI` is a bridge type).
+- Strings: the package has its own catalog (`AtriumCore/Resources/Localizable.xcstrings`) and looks them up with `bundle: .module`; their entries moved out of the app's catalog (two the app also uses stay in both).
+- Tests: `CoreManagerTests` and `ZipRobustnessTests` moved; the shared helpers are `AtriumCoreTests/Fixtures.swift`, which `AtriumTests` compiles too. Mixed test files stay in `AtriumTests` with `@testable import AtriumCore` and move with the code they test.
+- Still Apple-only inside the package, for Phase 1 (H10): `Compression` in `ZipArchive`, `Security` in `Keychain`/`LegacyName`, `zlib` imported as the SDK's module.
+
+**What holds back the rest** (found by compiling candidate sets on their own):
+
+| Needs | Files waiting | Unblocked by |
+|---|---|---|
+| Bridge types (`ShaderPreset`, `ShaderParameter`, `RetroInput`, `PadState`, `GraphicsAPI`, `AchievementClient`) | `ShaderIndex`, `ShaderPresetWriter`, `SlangPreset`, `SlangSource`, `ShaderDrafts`, `ShaderLibrary`, `ShaderWorkspace`, `InputMapping`, `InputProfile`, `HIDGamepadMapping`, `AchievementService` | `LibretroHost` in C (H1) |
+| `Game`/`PlayStatus` (SwiftData) | `DiscPlaylist`, `LibraryCollections`, `LibraryFilter`, then `LibraryScanner` (also `LibraryPaths`), `LibraryMatcher`, `GameVariants` (`TitleFormatter`) | `LibraryStore` split (H4) |
+| macOS key codes (`ARMSX2Controls`) | `PCSX2Config`, `ARMSX2Launch`; through `PCSX2Config.memoryCardFileName` also `BatterySave`, `ARMSX2States`, `SaveStates` (which also maps `GraphicsAPI`) | Key identifiers (H9); or move the constant and the `GraphicsAPI` mapping first |
+| Generated `GeneratedSecrets`, `Keychain` protocol | `Secrets`, `ScreenScraperClient` | Secret store protocol |
 
 ## Decisions
 

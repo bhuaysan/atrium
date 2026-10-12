@@ -10,13 +10,13 @@ import Security
 /// stays where it is: the preferences keep pointing at it.
 ///
 /// `AppPaths.root` runs it, as every access to the app's data goes through it.
-nonisolated enum LegacyName {
-    static let bundleIdentifier = "io.github.bhuaysan.Ursprung"
-    static let folderName = "Ursprung"
+public nonisolated enum LegacyName {
+    public static let bundleIdentifier = "io.github.bhuaysan.Ursprung"
+    public static let folderName = "Ursprung"
     /// Set in the new preferences once they were taken over.
-    static let migratedKey = "migratedFromUrsprung"
+    public static let migratedKey = "migratedFromUrsprung"
 
-    static func migrate(dataFolder root: URL) {
+    public static func migrate(dataFolder root: URL) {
         let fileManager = FileManager.default
         moveDataFolder(from: root.deletingLastPathComponent().appending(path: folderName, directoryHint: .isDirectory),
                        to: root)
@@ -30,7 +30,7 @@ nonisolated enum LegacyName {
     }
 
     /// Renames `legacy` to `root` unless `root` already exists.
-    static func moveDataFolder(from legacy: URL, to root: URL) {
+    public static func moveDataFolder(from legacy: URL, to root: URL) {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: legacy.path(percentEncoded: false)),
               !fileManager.fileExists(atPath: root.path(percentEncoded: false)) else { return }
@@ -39,7 +39,7 @@ nonisolated enum LegacyName {
 
     /// Copies the old preferences that `domain` (the one `defaults` writes
     /// to) does not have yet, once.
-    static func migratePreferences(from legacy: [String: Any]?, to defaults: UserDefaults, domain: String) {
+    public static func migratePreferences(from legacy: [String: Any]?, to defaults: UserDefaults, domain: String) {
         guard let legacy, !defaults.bool(forKey: migratedKey) else { return }
         let current = defaults.persistentDomain(forName: domain) ?? [:]
         for (key, value) in legacy where current[key] == nil {
@@ -52,7 +52,7 @@ nonisolated enum LegacyName {
     /// new service name, one at a time: macOS may ask whether Atrium may use
     /// an item, and one the user denies stays behind without holding back the
     /// others. It is tried again on the next launch.
-    static func moveKeychainItems(from legacyService: String, to service: String) {
+    public static func moveKeychainItems(from legacyService: String, to service: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: legacyService,

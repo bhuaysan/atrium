@@ -6,15 +6,15 @@ import Foundation
 /// its `#reference` lines and `key = value` pairs. It counts passes for the
 /// browser and finds the files a preset needs when it is imported. Loading
 /// and rendering always go through librashader.
-nonisolated struct SlangPresetFile: Sendable {
+public nonisolated struct SlangPresetFile: Sendable {
     /// Presets this one builds on, as written (relative to this file).
-    var references: [String] = []
+    public var references: [String] = []
     /// Later lines win, as in RetroArch.
-    var values: [String: String] = [:]
+    public var values: [String: String] = [:]
     /// Every `key = value` line in file order; a repeated key keeps its first place.
-    var entries: [(key: String, value: String)] = []
+    public var entries: [(key: String, value: String)] = []
 
-    init(text: String) {
+    public init(text: String) {
         for rawLine in text.split(whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("#reference") {
@@ -34,7 +34,7 @@ nonisolated struct SlangPresetFile: Sendable {
         }
     }
 
-    init(contentsOf url: URL) throws {
+    public init(contentsOf url: URL) throws {
         let data = try Data(contentsOf: url)
         self.init(text: String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self))
     }
@@ -50,7 +50,7 @@ nonisolated struct SlangPresetFile: Sendable {
     }
 
     /// Paths of the shader passes (`shader0`, `shader1`, …) in pass order.
-    var shaderPaths: [String] {
+    public var shaderPaths: [String] {
         values.compactMap { key, value -> (Int, String)? in
             guard key.hasPrefix("shader"), let index = Int(key.dropFirst("shader".count)) else { return nil }
             return (index, value)
@@ -60,7 +60,7 @@ nonisolated struct SlangPresetFile: Sendable {
     }
 
     /// Paths of the lookup textures named in `textures`.
-    var texturePaths: [String] {
+    public var texturePaths: [String] {
         (values["textures"] ?? "").split(separator: ";").compactMap { name in
             values[name.trimmingCharacters(in: .whitespaces)]
         }
@@ -70,14 +70,14 @@ nonisolated struct SlangPresetFile: Sendable {
 
     /// `path` as written in a preset or shader at `file`. Nil for paths
     /// RetroArch resolves itself (absolute, wildcards), which stay where they are.
-    static func resolve(_ path: String, from file: URL) -> URL? {
+    public static func resolve(_ path: String, from file: URL) -> URL? {
         let path = path.replacing("\\", with: "/")
         guard !path.isEmpty, !path.hasPrefix("/"), !path.hasPrefix(":"), !path.contains("$") else { return nil }
         return file.deletingLastPathComponent().appending(path: path).standardizedFileURL
     }
 
     /// The number of passes of the preset at `url`, following `#reference`.
-    static func passCount(of url: URL) -> Int? {
+    public static func passCount(of url: URL) -> Int? {
         passCount(of: url, depth: 0)
     }
 
@@ -95,14 +95,14 @@ nonisolated struct SlangPresetFile: Sendable {
     /// Everything the preset at `url` reads: itself, referenced presets,
     /// shaders with their `#include` files, and textures. `missing` lists
     /// relative paths that don't exist.
-    static func dependencies(of url: URL) -> (files: [URL], missing: [String]) {
+    public static func dependencies(of url: URL) -> (files: [URL], missing: [String]) {
         let dependencies = dependencies(of: url, within: { _ in true })
         return (dependencies.files, dependencies.missing)
     }
 
     /// `dependencies(of:)`, but files `allows` refuses are neither read nor
     /// followed; they are returned as `outside`.
-    static func dependencies(of url: URL, within allows: @escaping (URL) -> Bool)
+    public static func dependencies(of url: URL, within allows: @escaping (URL) -> Bool)
         -> (files: [URL], missing: [String], outside: [URL]) {
         var collector = DependencyCollector(allows: allows)
         collector.visitPreset(url.standardizedFileURL, depth: 0)
@@ -112,7 +112,7 @@ nonisolated struct SlangPresetFile: Sendable {
     /// The presets (following `#reference`) and shader passes the preset at
     /// `url` is made of, without reading the shaders. Only presets
     /// (`.slangp`) are read.
-    static func presetsAndPasses(of url: URL) -> [URL] {
+    public static func presetsAndPasses(of url: URL) -> [URL] {
         var collector = DependencyCollector(allows: { $0.pathExtension.lowercased() == "slangp" }, readsShaders: false)
         collector.visitPreset(url.standardizedFileURL, depth: 0)
         return collector.files

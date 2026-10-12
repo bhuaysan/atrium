@@ -2,7 +2,7 @@
 
 import Foundation
 import Testing
-@testable import Atrium
+@testable import AtriumCore
 
 private actor CallCounter {
     private(set) var count = 0

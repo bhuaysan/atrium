@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import SwiftUI
 
 /// Everything the user can do with one game. The grid's context menu, the

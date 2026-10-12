@@ -2,6 +2,7 @@
 
 #if DEBUG
 import AppKit
+import AtriumCore
 
 /// Development aids: with ATRIUM_DEBUG_PLAY or ATRIUM_DEBUG_STATES set
 /// (see `DebugEnvironment`), a started game exercises the player's features

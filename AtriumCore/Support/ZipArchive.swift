@@ -3,46 +3,47 @@
 import Compression
 import Foundation
 import Synchronization
+import zlib
 
 /// Read-only ZIP reader supporting "stored" and "deflate" entries — enough for
 /// ROM archives and libretro buildbot downloads. Uses the zip central
 /// directory, so listing an archive (including CRC32s) is instant.
-nonisolated struct ZipArchive: Sendable {
-    nonisolated struct Entry: Sendable, Hashable {
-        let path: String
-        let crc32: UInt32
-        let compressedSize: UInt64
-        let uncompressedSize: UInt64
-        let method: UInt16
-        let localHeaderOffset: UInt64
+public nonisolated struct ZipArchive: Sendable {
+    public nonisolated struct Entry: Sendable, Hashable {
+        public let path: String
+        public let crc32: UInt32
+        public let compressedSize: UInt64
+        public let uncompressedSize: UInt64
+        public let method: UInt16
+        public let localHeaderOffset: UInt64
 
-        var isDirectory: Bool { path.hasSuffix("/") }
-        var fileName: String { (path as NSString).lastPathComponent }
-        var fileExtension: String { (path as NSString).pathExtension.lowercased() }
+        public var isDirectory: Bool { path.hasSuffix("/") }
+        public var fileName: String { (path as NSString).lastPathComponent }
+        public var fileExtension: String { (path as NSString).pathExtension.lowercased() }
     }
 
-    enum ZipError: LocalizedError {
+    public enum ZipError: LocalizedError {
         case notAZip
         case unsupportedMethod(UInt16)
         case corrupt
         case decompressionFailed
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
-            case .notAZip: String(localized: "The file is not a valid ZIP archive.")
-            case .unsupportedMethod(let method): String(localized: "Unsupported ZIP compression method \(method).")
-            case .corrupt: String(localized: "The ZIP archive is damaged.")
-            case .decompressionFailed: String(localized: "The ZIP archive could not be decompressed.")
+            case .notAZip: String(localized: "The file is not a valid ZIP archive.", bundle: .module)
+            case .unsupportedMethod(let method): String(localized: "Unsupported ZIP compression method \(method).", bundle: .module)
+            case .corrupt: String(localized: "The ZIP archive is damaged.", bundle: .module)
+            case .decompressionFailed: String(localized: "The ZIP archive could not be decompressed.", bundle: .module)
             }
         }
     }
 
-    let url: URL
-    let entries: [Entry]
+    public let url: URL
+    public let entries: [Entry]
     /// Where the central directory starts: every entry's data lies before it.
-    let directoryOffset: UInt64
+    public let directoryOffset: UInt64
 
-    init(url: URL) throws {
+    public init(url: URL) throws {
         self.url = url
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
@@ -50,18 +51,18 @@ nonisolated struct ZipArchive: Sendable {
     }
 
     /// Files only (no directory entries, no macOS resource forks).
-    var files: [Entry] {
+    public var files: [Entry] {
         entries.filter { !$0.isDirectory && !$0.path.hasPrefix("__MACOSX/") && !$0.fileName.hasPrefix("._") }
     }
 
-    func extract(_ entry: Entry, to destination: URL) throws {
+    public func extract(_ entry: Entry, to destination: URL) throws {
         let output = try data(of: entry)
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         try output.write(to: destination, options: .atomic)
     }
 
     /// The entry's contents, checked against its CRC32.
-    func data(of entry: Entry) throws -> Data {
+    public func data(of entry: Entry) throws -> Data {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         guard let compressedSize = Int(exactly: entry.compressedSize),
@@ -92,7 +93,7 @@ nonisolated struct ZipArchive: Sendable {
     /// Whether every entry in `entries` has its local header and its data
     /// lies before the central directory, as in a file written completely.
     /// The data itself is neither read nor checked.
-    func hasIntactLocalHeaders(_ entries: [Entry]) -> Bool {
+    public func hasIntactLocalHeaders(_ entries: [Entry]) -> Bool {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? handle.close() }
         return entries.allSatisfy { (try? dataOffset(of: $0, in: handle)) != nil }
@@ -122,7 +123,7 @@ nonisolated struct ZipArchive: Sendable {
     /// very same archive entry is still there. The cache is keyed by the
     /// entry's path, size and CRC32, so a replaced archive is never served
     /// from stale data, and an interrupted extraction leaves no marker.
-    static func extractCached(_ entry: Entry, from archiveURL: URL, into directory: URL) throws -> URL {
+    public static func extractCached(_ entry: Entry, from archiveURL: URL, into directory: URL) throws -> URL {
         let destination = directory.appending(path: entry.fileName)
         let marker = directory.appending(path: ".identity")
         let identity = "\(entry.path)|\(entry.uncompressedSize)|\(entry.crc32)"
@@ -139,7 +140,7 @@ nonisolated struct ZipArchive: Sendable {
 
     /// Extracts all files below `directory`, preserving relative paths.
     /// `concurrently` spreads large archives with many files over all cores.
-    func extractAll(to directory: URL, concurrently: Bool = false) throws {
+    public func extractAll(to directory: URL, concurrently: Bool = false) throws {
         @Sendable func extract(_ entry: Entry) throws {
             let safePath = entry.path.split(separator: "/").filter { $0 != ".." && $0 != "." }.joined(separator: "/")
             try self.extract(entry, to: directory.appending(path: safePath))
@@ -275,22 +276,22 @@ nonisolated struct ZipArchive: Sendable {
 }
 
 nonisolated extension Data {
-    func uint16(at offset: Int) -> UInt16 {
+    public func uint16(at offset: Int) -> UInt16 {
         UInt16(self[startIndex + offset]) | UInt16(self[startIndex + offset + 1]) << 8
     }
 
-    func uint32(at offset: Int) -> UInt32 {
+    public func uint32(at offset: Int) -> UInt32 {
         UInt32(uint16(at: offset)) | UInt32(uint16(at: offset + 2)) << 16
     }
 
-    func uint64(at offset: Int) -> UInt64 {
+    public func uint64(at offset: Int) -> UInt64 {
         UInt64(uint32(at: offset)) | UInt64(uint32(at: offset + 4)) << 32
     }
 }
 
 /// CRC32 (IEEE) via zlib, streaming for large files.
-nonisolated enum Checksum {
-    static func crc(of url: URL, maxBytes: UInt64 = .max) throws -> UInt32 {
+public nonisolated enum Checksum {
+    public static func crc(of url: URL, maxBytes: UInt64 = .max) throws -> UInt32 {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         var crc = crc32(0, nil, 0)
@@ -304,7 +305,7 @@ nonisolated enum Checksum {
         return UInt32(crc)
     }
 
-    static func crc(of data: Data) -> UInt32 {
+    public static func crc(of data: Data) -> UInt32 {
         data.withUnsafeBytes { buffer in
             var crc = crc32(0, nil, 0)
             var offset = 0
@@ -318,7 +319,7 @@ nonisolated enum Checksum {
         }
     }
 
-    static func hex(_ value: UInt32) -> String {
+    public static func hex(_ value: UInt32) -> String {
         String(format: "%08X", value)
     }
 }

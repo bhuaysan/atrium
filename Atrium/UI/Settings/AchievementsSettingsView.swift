@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import SwiftUI
 
 /// The RetroAchievements account and how achievements behave while playing.

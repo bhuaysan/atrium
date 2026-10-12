@@ -4,6 +4,7 @@ import Foundation
 import SwiftData
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// An ISO 9660 image with a root directory that holds only `SYSTEM.CNF`.
 /// `raw` wraps every sector like a Mode 2 Form 1 BIN (2352 bytes).

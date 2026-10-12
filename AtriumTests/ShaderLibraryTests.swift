@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// Zips the contents of `folder` (not the folder itself) into `archive`.
 func makeZip(at archive: URL, of folder: URL) throws {

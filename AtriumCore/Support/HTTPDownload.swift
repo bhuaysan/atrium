@@ -4,20 +4,20 @@ import Foundation
 
 /// Downloads from the libretro buildbot (cores, the shader pack) and GitHub
 /// releases (standalone emulators).
-nonisolated enum HTTPDownload {
+public nonisolated enum HTTPDownload {
     /// Fetches a URL to a temporary file, reporting progress (0…1).
-    typealias Downloader = @Sendable (URL, @escaping @Sendable (Double) -> Void) async throws -> URL
+    public typealias Downloader = @Sendable (URL, @escaping @Sendable (Double) -> Void) async throws -> URL
     /// When the file at a URL last changed on the server (HTTP Last-Modified).
-    typealias LastModifiedFetcher = @Sendable (URL) async throws -> Date?
+    public typealias LastModifiedFetcher = @Sendable (URL) async throws -> Date?
 
     /// The server answered with something other than 200 OK.
-    struct StatusError: Error {
-        let status: Int
+    public struct StatusError: Error {
+        public let status: Int
     }
 
     /// Fetches `url` to a temporary file with the URL's extension (`.zip`
     /// when it has none), reporting progress (0…1).
-    static func file(from url: URL, onProgress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+    public static func file(from url: URL, onProgress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         let tracker = DownloadTracker(onProgress: onProgress)
         let (temporary, response) = try await URLSession.shared.download(from: url, delegate: tracker)
         tracker.stop()
@@ -32,7 +32,7 @@ nonisolated enum HTTPDownload {
     }
 
     /// When the file at `url` last changed on the server (HTTP Last-Modified).
-    static func lastModified(of url: URL) async throws -> Date? {
+    public static func lastModified(of url: URL) async throws -> Date? {
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
         let (_, response) = try await URLSession.shared.data(for: request)

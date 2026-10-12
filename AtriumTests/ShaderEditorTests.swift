@@ -5,6 +5,7 @@ import Metal
 import MetalKit
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 private func write(_ text: String, to url: URL) throws {
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

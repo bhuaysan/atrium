@@ -4,6 +4,7 @@ import Foundation
 import SwiftData
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// A defaults suite of its own, removed when the test ends.
 private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {

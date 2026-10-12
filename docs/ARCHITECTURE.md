@@ -41,19 +41,20 @@ and [librashader](https://github.com/SnowflakePowered/librashader)
 
 | Path | Purpose |
 |---|---|
+| `Package.swift`, `AtriumCore` | Swift package with the platform-neutral code the Linux port will share (docs/LINUX_PLAN.md): systems catalog, paths, preferences, backup format, ZIP reader, core downloads, PINE client, shader selection; its own string catalog in `AtriumCore/Resources` |
 | `Atrium/App` | App entry point, scenes, menu commands |
-| `Atrium/Systems` | `GameSystem`/`CoreDefinition` models and the `SystemCatalog` |
 | `Atrium/Library` | SwiftData `Game` model, folder scanner, `LibraryStore`, ROM patches and per-game extras |
 | `Atrium/Achievements` | RetroAchievements account (`AchievementService`) |
 | `Atrium/Metadata` | ScreenScraper API client and the scraping queue |
-| `Atrium/Cores` | Core download/installation and BIOS management |
+| `Atrium/Cores` | BIOS management, standalone emulator installs (`CoreManager` is in `AtriumCore`) |
 | `Atrium/Emulation` | Session control, input routing, Metal renderer, shaders |
 | `Atrium/Bridge` | Objective-C/C libretro host, `libretro.h`, rewind buffer, rcheevos client, librashader presets and filter chains, bridging header |
 | `Atrium/UI` | SwiftUI views (library, player, settings, components) |
-| `Atrium/Support` | Paths, preferences, keychain, ZIP reader, secrets |
+| `Atrium/Support` | Secrets, update check, debug snapshots |
 | `ThirdParty/rcheevos` | rcheevos 12.5.0 (see its README for what was left out) |
 | `Tools/atrium-smoke` | Headless command-line harness for cores |
-| `AtriumTests` | Unit tests (Swift Testing) |
+| `AtriumTests` | Unit tests (Swift Testing), run inside the app |
+| `AtriumCoreTests` | Tests of `AtriumCore` alone (`swift test`); `make test` runs them too |
 
 ## Concurrency model
 

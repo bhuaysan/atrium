@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 nonisolated private func record(_ path: String, id: UUID = UUID(), crc: String? = nil, size: Int64 = 3) -> GameRecord {
     GameRecord(id: id, path: path, systemID: "snes", title: "t", fileName: (path as NSString).lastPathComponent,

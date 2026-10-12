@@ -7,32 +7,32 @@ import Foundation
 /// with a `RESET` entry, and the `ROMVER` file holds version, region and date.
 /// Dumps exist in dozens of versions with arbitrary names, so neither the
 /// file name nor a checksum identifies them.
-nonisolated struct PS2BIOS: Sendable, Hashable {
-    enum Region: String, Sendable {
+public nonisolated struct PS2BIOS: Sendable, Hashable {
+    public enum Region: String, Sendable {
         case japan, usa, europe, asia, china, other
     }
 
     /// File name inside the BIOS folder.
-    let fileName: String
-    let region: Region
+    public let fileName: String
+    public let region: Region
     /// "2.00" for ROMVER `0200…`.
-    let version: String
+    public let version: String
     /// Build date from ROMVER, at noon UTC so it shows as the same day everywhere.
-    let date: Date?
+    public let date: Date?
 
     /// ARMSX2 only considers files of this size (`MIN_BIOS_SIZE`, `MAX_BIOS_SIZE`).
-    static let sizeRange = (4 << 20)...(8 << 20)
+    public static let sizeRange = (4 << 20)...(8 << 20)
 
     /// Files ARMSX2 loads next to a dump with the same base name.
-    static let sideFileExtensions: Set<String> = ["erom", "rom1", "rom2", "nvm", "mec"]
+    public static let sideFileExtensions: Set<String> = ["erom", "rom1", "rom2", "nvm", "mec"]
 
-    static func inspect(_ url: URL) -> PS2BIOS? {
+    public static func inspect(_ url: URL) -> PS2BIOS? {
         guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, sizeRange.contains(size),
               let data = try? Data(contentsOf: url, options: .alwaysMapped) else { return nil }
         return parse(data, fileName: url.lastPathComponent)
     }
 
-    static func parse(_ data: Data, fileName: String) -> PS2BIOS? {
+    public static func parse(_ data: Data, fileName: String) -> PS2BIOS? {
         guard sizeRange.contains(data.count), let romver = romver(in: data) else { return nil }
         let text = String(decoding: romver, as: UTF8.self)
         let characters = Array(text)

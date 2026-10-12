@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import Foundation
 
 /// ARMSX2's save state files in a game's state folder (docs/STANDALONE_PLAN.md, S8).

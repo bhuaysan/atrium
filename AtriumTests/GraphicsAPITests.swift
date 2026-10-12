@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// Which graphics API a core is asked for, and what follows from it
 /// (docs/VULKAN_PLAN.md, phase 3).

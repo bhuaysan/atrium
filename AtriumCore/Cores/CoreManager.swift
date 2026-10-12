@@ -8,34 +8,34 @@ import Observation
 /// Cores are GPL/non-commercial third-party software and are therefore not
 /// bundled with Atrium; they are fetched on demand.
 @Observable
-final class CoreManager {
-    enum CoreError: LocalizedError {
+public final class CoreManager {
+    public enum CoreError: LocalizedError {
         case downloadFailed(String)
         case invalidArchive
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
-            case .downloadFailed(let reason): String(localized: "The core could not be downloaded: \(reason)")
-            case .invalidArchive: String(localized: "The downloaded core archive is invalid.")
+            case .downloadFailed(let reason): String(localized: "The core could not be downloaded: \(reason)", bundle: .module)
+            case .invalidArchive: String(localized: "The downloaded core archive is invalid.", bundle: .module)
             }
         }
     }
 
-    static let buildbot = URL(string: "https://buildbot.libretro.com/nightly/apple/osx/arm64/latest/")!
+    public static let buildbot = URL(string: "https://buildbot.libretro.com/nightly/apple/osx/arm64/latest/")!
 
-    typealias Downloader = HTTPDownload.Downloader
-    typealias LastModifiedFetcher = HTTPDownload.LastModifiedFetcher
+    public typealias Downloader = HTTPDownload.Downloader
+    public typealias LastModifiedFetcher = HTTPDownload.LastModifiedFetcher
 
     /// Download progress (0…1) for cores currently being installed.
-    private(set) var downloads: [String: Double] = [:]
+    public private(set) var downloads: [String: Double] = [:]
     /// Bumped whenever the set of installed cores changes.
-    private(set) var revision = 0
+    public private(set) var revision = 0
     /// Installed and previous version of every core Atrium installed.
-    private(set) var versions: [String: CoreVersionEntry]
+    public private(set) var versions: [String: CoreVersionEntry]
     /// Cores with a newer build on the buildbot than the installed one.
-    private(set) var updatesAvailable: Set<String> = []
-    private(set) var isCheckingForUpdates = false
-    private(set) var lastUpdateCheck: Date?
+    public private(set) var updatesAvailable: Set<String> = []
+    public private(set) var isCheckingForUpdates = false
+    public private(set) var lastUpdateCheck: Date?
 
     private let coresDirectory: URL
     private let systemDirectory: URL
@@ -45,10 +45,10 @@ final class CoreManager {
     /// being installed waits for this one operation and shares its outcome.
     private var installations: [String: Task<Void, Error>] = [:]
 
-    init(coresDirectory: URL = AppPaths.cores,
-         systemDirectory: URL = AppPaths.system,
-         downloader: @escaping Downloader = CoreManager.downloadFile,
-         lastModified: @escaping LastModifiedFetcher = CoreManager.fetchLastModified) {
+    public init(coresDirectory: URL = AppPaths.cores,
+                systemDirectory: URL = AppPaths.system,
+                downloader: @escaping Downloader = CoreManager.downloadFile,
+                lastModified: @escaping LastModifiedFetcher = CoreManager.fetchLastModified) {
         self.coresDirectory = coresDirectory
         self.systemDirectory = systemDirectory
         self.downloader = downloader
@@ -57,11 +57,11 @@ final class CoreManager {
     }
 
     /// All distinct libretro cores referenced by the system catalog.
-    static let allCores: [CoreDefinition] = distinctCores.filter(\.isLibretro)
+    public static let allCores: [CoreDefinition] = distinctCores.filter(\.isLibretro)
 
     /// Standalone emulators from the system catalog; they are not installed
     /// by `CoreManager`.
-    static let standaloneEmulators: [CoreDefinition] = distinctCores.filter { !$0.isLibretro }
+    public static let standaloneEmulators: [CoreDefinition] = distinctCores.filter { !$0.isLibretro }
 
     private static let distinctCores: [CoreDefinition] = {
         var seen = Set<String>()
@@ -69,29 +69,29 @@ final class CoreManager {
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }()
 
-    func installedURL(for core: CoreDefinition) -> URL {
+    public func installedURL(for core: CoreDefinition) -> URL {
         coresDirectory.appending(path: core.fileName)
     }
 
-    func isInstalled(_ core: CoreDefinition) -> Bool {
+    public func isInstalled(_ core: CoreDefinition) -> Bool {
         _ = revision
         return FileManager.default.fileExists(atPath: installedURL(for: core).path(percentEncoded: false))
     }
 
-    func installedDate(_ core: CoreDefinition) -> Date? {
+    public func installedDate(_ core: CoreDefinition) -> Date? {
         _ = revision
         let attributes = try? FileManager.default.attributesOfItem(atPath: installedURL(for: core).path(percentEncoded: false))
         return attributes?[.modificationDate] as? Date
     }
 
     /// Returns the path of the core, downloading it (and its system assets) first if needed.
-    func ensureInstalled(_ core: CoreDefinition) async throws -> URL {
+    public func ensureInstalled(_ core: CoreDefinition) async throws -> URL {
         try await install(core, replacing: false)
         return installedURL(for: core)
     }
 
     /// Downloads the core (again, if it is installed) together with its system assets.
-    func install(_ core: CoreDefinition) async throws {
+    public func install(_ core: CoreDefinition) async throws {
         try await install(core, replacing: true)
     }
 
@@ -107,7 +107,7 @@ final class CoreManager {
         try await task.value
     }
 
-    func remove(_ core: CoreDefinition) {
+    public func remove(_ core: CoreDefinition) {
         try? FileManager.default.removeItem(at: installedURL(for: core))
         try? FileManager.default.removeItem(at: previousURL(for: core))
         versions[core.id] = nil
@@ -119,17 +119,17 @@ final class CoreManager {
     // MARK: - Versions
 
     /// Where the version before the last update is kept.
-    func previousURL(for core: CoreDefinition) -> URL {
+    public func previousURL(for core: CoreDefinition) -> URL {
         coresDirectory.appending(path: "Previous", directoryHint: .isDirectory).appending(path: core.fileName)
     }
 
-    func hasPreviousVersion(_ core: CoreDefinition) -> Bool {
+    public func hasPreviousVersion(_ core: CoreDefinition) -> Bool {
         _ = revision
         return FileManager.default.fileExists(atPath: previousURL(for: core).path(percentEncoded: false))
     }
 
     /// Notes the version a core reported when a game started with it.
-    func recordVersion(_ version: String, for core: CoreDefinition) {
+    public func recordVersion(_ version: String, for core: CoreDefinition) {
         guard !version.isEmpty else { return }
         let coreID = core.id
         var entry = versions[coreID] ?? CoreVersionEntry()
@@ -142,7 +142,7 @@ final class CoreManager {
 
     /// Puts the version before the last update back; the newer one becomes
     /// the previous version, so this can be undone the same way.
-    func restorePreviousVersion(_ core: CoreDefinition) throws {
+    public func restorePreviousVersion(_ core: CoreDefinition) throws {
         let fileManager = FileManager.default
         let current = installedURL(for: core), previous = previousURL(for: core)
         let swap = coresDirectory.appending(path: ".\(core.fileName).swap")
@@ -166,7 +166,7 @@ final class CoreManager {
     }
 
     /// Asks the buildbot which installed cores have newer builds.
-    func checkForUpdates(of candidates: [CoreDefinition] = CoreManager.allCores) async throws {
+    public func checkForUpdates(of candidates: [CoreDefinition] = CoreManager.allCores) async throws {
         guard !isCheckingForUpdates else { return }
         isCheckingForUpdates = true
         defer { isCheckingForUpdates = false }
@@ -227,7 +227,7 @@ final class CoreManager {
         }
     }
 
-    private static let downloadFile: Downloader = { url, onProgress in
+    @usableFromInline static let downloadFile: Downloader = { url, onProgress in
         do {
             return try await HTTPDownload.file(from: url, onProgress: onProgress)
         } catch let error as HTTPDownload.StatusError {
@@ -235,7 +235,7 @@ final class CoreManager {
         }
     }
 
-    private static let fetchLastModified: LastModifiedFetcher = { try await HTTPDownload.lastModified(of: $0) }
+    @usableFromInline static let fetchLastModified: LastModifiedFetcher = { try await HTTPDownload.lastModified(of: $0) }
 
     @concurrent
     private static func extractCore(archive: URL, fileName: String, to destination: URL) async throws {
@@ -258,27 +258,27 @@ final class CoreManager {
 }
 
 /// One version of an installed core.
-nonisolated struct CoreVersionRecord: Codable, Equatable, Sendable {
+public nonisolated struct CoreVersionRecord: Codable, Equatable, Sendable {
     /// The core's own version (libretro `library_version`); known once a
     /// game ran with it.
-    var version: String?
-    var installed: Date
+    public var version: String?
+    public var installed: Date
 }
 
 /// A core's installed version and the one before its last update.
-nonisolated struct CoreVersionEntry: Codable, Equatable, Sendable {
-    var current: CoreVersionRecord?
-    var previous: CoreVersionRecord?
+public nonisolated struct CoreVersionEntry: Codable, Equatable, Sendable {
+    public var current: CoreVersionRecord?
+    public var previous: CoreVersionRecord?
 }
 
 /// `Cores/versions.json`.
-nonisolated enum CoreVersionStore {
-    static func load(in coresDirectory: URL) -> [String: CoreVersionEntry] {
+public nonisolated enum CoreVersionStore {
+    public static func load(in coresDirectory: URL) -> [String: CoreVersionEntry] {
         guard let data = try? Data(contentsOf: coresDirectory.appending(path: "versions.json")) else { return [:] }
         return (try? decoder.decode([String: CoreVersionEntry].self, from: data)) ?? [:]
     }
 
-    static func save(_ versions: [String: CoreVersionEntry], in coresDirectory: URL) throws {
+    public static func save(_ versions: [String: CoreVersionEntry], in coresDirectory: URL) throws {
         try FileManager.default.createDirectory(at: coresDirectory, withIntermediateDirectories: true)
         // Dates as numbers: exact, so they compare equal after a restart.
         let encoder = JSONEncoder()

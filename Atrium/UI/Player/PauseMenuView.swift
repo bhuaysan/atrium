@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import AppKit
+import AtriumCore
 import SwiftUI
 
 /// One glass panel with menu-like rows, operable by pointer, keyboard and

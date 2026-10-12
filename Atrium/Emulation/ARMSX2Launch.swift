@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AtriumCore
 import Foundation
 
 /// Why ARMSX2 is not started for a game. Every error ARMSX2 would report

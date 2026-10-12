@@ -1,0 +1,516 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Pixel Perfect": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pixelgenau"
+          }
+        }
+      }
+    },
+    "Required for Neo Geo games.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erforderlich für Neo-Geo-Spiele."
+          }
+        }
+      }
+    },
+    "Scanlines": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scanlines"
+          }
+        }
+      }
+    },
+    "Sharp": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scharf"
+          }
+        }
+      }
+    },
+    "Smooth": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weich"
+          }
+        }
+      }
+    },
+    "The ZIP archive could not be decompressed.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ZIP-Archiv konnte nicht entpackt werden."
+          }
+        }
+      }
+    },
+    "The ZIP archive is damaged.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ZIP-Archiv ist beschädigt."
+          }
+        }
+      }
+    },
+    "The core could not be downloaded: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Core konnte nicht geladen werden: %@"
+          }
+        }
+      }
+    },
+    "The downloaded core archive is invalid.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das geladene Core-Archiv ist ungültig."
+          }
+        }
+      }
+    },
+    "The file is not a valid ZIP archive.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei ist kein gültiges ZIP-Archiv."
+          }
+        }
+      }
+    },
+    "Unsupported ZIP compression method %u.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht unterstützte ZIP-Kompression %u."
+          }
+        }
+      }
+    },
+    "Improves accuracy.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbessert die Genauigkeit."
+          }
+        }
+      }
+    },
+    "Flycast includes an HLE BIOS.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flycast enthält ein HLE-BIOS."
+          }
+        }
+      }
+    },
+    "The file is not an Atrium backup.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei ist kein Atrium-Backup."
+          }
+        }
+      }
+    },
+    "The backup was made by a newer version of Atrium. Update Atrium to restore it.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Backup stammt von einer neueren Version von Atrium. Aktualisiere Atrium, um es wiederherzustellen."
+          }
+        }
+      }
+    },
+    "The backup is incomplete: %lld files are missing or have the wrong size. Nothing was restored.": {
+      "localizations": {
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Das Backup ist unvollständig: %lld Datei fehlt oder hat die falsche Größe. Es wurde nichts wiederhergestellt."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Das Backup ist unvollständig: %lld Dateien fehlen oder haben die falsche Größe. Es wurde nichts wiederhergestellt."
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The backup is incomplete: %lld file is missing or has the wrong size. Nothing was restored."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The backup is incomplete: %lld files are missing or have the wrong size. Nothing was restored."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "The backup is damaged. Nothing was restored. %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Backup ist beschädigt. Es wurde nichts wiederhergestellt. %@"
+          }
+        }
+      }
+    },
+    "before restore %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vor der Wiederherstellung %@"
+          }
+        }
+      }
+    },
+    "from backup %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aus Backup %@"
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch"
+          }
+        }
+      }
+    },
+    "Custom": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eigene"
+          }
+        }
+      }
+    },
+    "Ambient Light": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Umgebungslicht"
+          }
+        }
+      }
+    },
+    "CRT": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Röhrenfernseher"
+          }
+        }
+      }
+    },
+    "CRT, Curved": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Röhrenfernseher, gewölbt"
+          }
+        }
+      }
+    },
+    "Handheld LCD": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handheld-LCD"
+          }
+        }
+      }
+    },
+    "None": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine"
+          }
+        }
+      }
+    },
+    "Patching produced a different result than the patch expects.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Patchen ergab ein anderes Ergebnis, als der Patch erwartet."
+          }
+        }
+      }
+    },
+    "The patch file is damaged.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Patch-Datei ist beschädigt."
+          }
+        }
+      }
+    },
+    "The patch is made for another version of the game (CRC32 %@, this file has %@).": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Patch ist für eine andere Version des Spiels (CRC32 %1$@, diese Datei hat %2$@)."
+          }
+        }
+      }
+    },
+    "This isn't an IPS, UPS or BPS patch.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ist kein IPS-, UPS- oder BPS-Patch."
+          }
+        }
+      }
+    },
+    "The file doesn't exist.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei existiert nicht."
+          }
+        }
+      }
+    },
+    "It is already in your shaders.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ist bereits in deinen Shadern."
+          }
+        }
+      }
+    },
+    "The folder contains no shader presets (.slangp).": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Ordner enthält keine Shader-Presets (.slangp)."
+          }
+        }
+      }
+    },
+    "Only shader presets (.slangp) and folders can be imported.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur Shader-Presets (.slangp) und Ordner können importiert werden."
+          }
+        }
+      }
+    },
+    "Some files it refers to weren't copied, as they aren't shaders or images in its folder: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einige Dateien, auf die es verweist, wurden nicht kopiert, da sie keine Shader oder Bilder in seinem Ordner sind: %@"
+          }
+        }
+      }
+    },
+    "Read Me.txt": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lies mich.txt"
+          }
+        }
+      }
+    },
+    "Atrium — game folders\n\nROMs\nPut each game into the folder of its system, for example Super Nintendo games into “ROMs/Super Nintendo”. Atrium adds them to the library as soon as they arrive. Sub folders are fine, for example one per disc game. Cartridge games may be zipped; arcade games stay zipped as they are.\n\nBIOS\nPut BIOS files here under any name. Atrium recognizes them and copies them to where the emulators expect them. Settings › BIOS shows which ones are still missing.\n\nFolders you don't need can be deleted. Only use games and BIOS files from hardware you own.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atrium – Spieleordner\n\nROMs\nLege jedes Spiel in den Ordner seines Systems, zum Beispiel Super-Nintendo-Spiele in „ROMs/Super Nintendo“. Atrium nimmt sie in die Bibliothek auf, sobald sie da sind. Unterordner sind kein Problem, zum Beispiel einer pro Disc-Spiel. Modulspiele dürfen gezippt sein; Arcade-Spiele bleiben gezippt, wie sie sind.\n\nBIOS\nLege BIOS-Dateien unter beliebigem Namen hier ab. Atrium erkennt sie und kopiert sie dorthin, wo die Emulatoren sie erwarten. Unter Einstellungen › BIOS siehst du, welche noch fehlen.\n\nOrdner, die du nicht brauchst, kannst du löschen. Verwende nur Spiele und BIOS-Dateien von Hardware, die du besitzt."
+          }
+        }
+      }
+    },
+    "Links to files outside the folder weren't copied: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verknüpfungen zu Dateien außerhalb des Ordners wurden nicht kopiert: %@"
+          }
+        }
+      }
+    },
+    "Its shaders are spread over your whole home folder or disk. Import the folder that holds them instead.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seine Shader sind über deinen ganzen Benutzerordner oder ein ganzes Volume verteilt. Importiere stattdessen den Ordner, der sie enthält."
+          }
+        }
+      }
+    },
+    "Blue": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blau"
+          }
+        }
+      }
+    },
+    "Purple": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lila"
+          }
+        }
+      }
+    },
+    "Pink": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pink"
+          }
+        }
+      }
+    },
+    "Red": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rot"
+          }
+        }
+      }
+    },
+    "Orange": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orange"
+          }
+        }
+      }
+    },
+    "Yellow": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gelb"
+          }
+        }
+      }
+    },
+    "Green": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grün"
+          }
+        }
+      }
+    },
+    "Graphite": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Graphit"
+          }
+        }
+      }
+    },
+    "Coral": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koralle"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

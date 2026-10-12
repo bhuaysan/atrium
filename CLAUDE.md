@@ -9,7 +9,8 @@ Called Ursprung until October 2026 (hence the `UR` prefix of the bridge);
 ## Commands
 
 - `make project` — regenerate `Atrium.xcodeproj` from `project.yml` (never edit the xcodeproj; it is git-ignored). Run after adding/removing files.
-- `make build` / `make test` / `make run`
+- `make build` / `make test` / `make run` (`make test` includes the package's tests)
+- `swift test` — builds and tests only the `AtriumCore` package (`Package.swift`), without Xcode.
 - `make smoke CORE=<dylib> ROM=<file>` — headless core check, writes `smoke.png`.
 - Tests use Swift Testing (`import Testing`), in `AtriumTests/`.
 - `Tools/atrium-test-core` is a tiny libretro core copied into the test bundle; `EmulationRunnerTests` drive it frame by frame via `UREmulationRunner+Testing.h`.
@@ -20,14 +21,15 @@ Called Ursprung until October 2026 (hence the `UR` prefix of the bridge);
 - ScreenScraper media URLs embed API credentials: never log, print or persist them.
 - New files start with `// SPDX-License-Identifier: GPL-3.0-or-later`.
 - No third-party dependencies without discussion. Agreed so far: rcheevos in `ThirdParty/rcheevos` (MIT, vendored) and librashader in `ThirdParty/librashader` (MPL-2.0/GPL-3.0, prebuilt dylib fetched by `Scripts/fetch-librashader.sh`); MoltenVK in `ThirdParty/moltenvk` (Apache-2.0, prebuilt dylib and Vulkan headers fetched by `Scripts/fetch-moltenvk.sh`, linked directly, no Vulkan loader); see their READMEs for updating. ARMSX2 (GPL-3.0) runs PlayStation 2 games as a standalone emulator: downloaded at runtime from its GitHub releases (pinned in `SystemCatalog`), never bundled or vendored; see `docs/STANDALONE_PLAN.md`. For the planned Linux build only (system libraries, not vendored): GTK 4, libadwaita, GtkSourceView 5, SDL3, SQLite, libsecret, liblz4; PCSX2 (GPL-3.0) as a pinned AppImage like ARMSX2; see `docs/LINUX_PLAN.md`.
-- User-facing strings must be localizable; add German to `Atrium/Resources/Localizable.xcstrings`.
+- User-facing strings must be localizable; add German to `Atrium/Resources/Localizable.xcstrings`, or for strings in `AtriumCore` (looked up with `bundle: .module`) to `AtriumCore/Resources/Localizable.xcstrings`.
 
 ## Conventions
 
 - Swift 6, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, approachable concurrency. Mark data types / helpers used off the main actor `nonisolated`; background work goes into `@concurrent` functions.
 - Services are `@Observable` classes injected via `.environment(...)` in `AtriumApp`.
 - Only one core can run at a time (libretro callbacks are global C functions). All `retro_*` calls happen on the `UREmulationRunner` thread; use `performOnEmulationThread(_:)` from Swift.
-- Systems, cores, BIOS files and core option defaults are data in `Atrium/Systems/SystemCatalog.swift`.
+- `AtriumCore` (the root `Package.swift`, linked by the app) holds platform-neutral code the Linux port will share (docs/LINUX_PLAN.md, Phase 0): Foundation only, no SwiftUI/AppKit/SwiftData/bridge types. Its API is `public`; app files `import AtriumCore`, tests `@testable import AtriumCore`. Code moves there once nothing it needs is app-only.
+- Systems, cores, BIOS files and core option defaults are data in `AtriumCore/Systems/SystemCatalog.swift`.
 - Accent colour: the user picks it in Settings › Appearance. Draw with `.tint` (or `.favorite`), never `Color.accentColor`, which ignores the choice; new windows' root views need `.appAccent()`. See `Atrium/UI/Components/AppAccent.swift`.
 - Shaders live in `Atrium/Emulation/ShaderSource.swift` and are compiled at runtime (no Metal toolchain needed).
 - Hardware rendering: `URGLContext` (OpenGL 4.1) or `URVulkanContext` (MoltenVK); both read frames back into the CPU frame buffer. Which API a core is asked for is `CoreDefinition.renderer` plus the user's choice (Settings › Cores); renderer-specific option defaults go in `vulkanOptionDefaults`. See `docs/VULKAN_PLAN.md`. Check a core with `make smoke … RENDERER=vulkan` (`ATRIUM_VULKAN_LOG=1` for the context's log).

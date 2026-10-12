@@ -4,6 +4,7 @@ import Foundation
 import SwiftData
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// Lets a test hold the first scan open while it changes the folder list.
 private actor ScanGate {

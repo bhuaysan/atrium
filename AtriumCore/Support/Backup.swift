@@ -3,87 +3,136 @@
 import Foundation
 
 /// Where Atrium keeps the data a backup contains.
-nonisolated struct DataLocations: Sendable {
-    var saves: URL
-    var states: URL
-    var media: URL
+public nonisolated struct DataLocations: Sendable {
+    public var saves: URL
+    public var states: URL
+    public var media: URL
     /// Screenshots, manuals, patches and cheats (`GameExtras`).
-    var extras: URL
+    public var extras: URL
     /// Bezel images, one per system.
-    var bezels: URL
+    public var bezels: URL
     /// The user's own shader presets (not the downloaded pack).
-    var shaders: URL
+    public var shaders: URL
 
-    static var standard: DataLocations {
+    public static var standard: DataLocations {
         DataLocations(saves: AppPaths.saves, states: AppPaths.states, media: AppPaths.media, extras: AppPaths.extras,
                       bezels: AppPaths.bezels, shaders: AppPaths.userShaders)
     }
 }
 
 /// One game of the library as written to a backup.
-nonisolated struct GameRecord: Codable, Sendable, Hashable {
-    var id: UUID
-    var path: String
-    var systemID: String
-    var title: String
-    var fileName: String
-    var fileSize: Int64
-    var crc32: String?
-    var fileModified: Date?
-    var dateAdded: Date
-    var lastPlayed: Date?
-    var playCount: Int
-    var playTime: Double
-    var isFavorite: Bool
-    var coreID: String?
-    var missingSince: Date?
-    var scrapeState: String
-    var screenScraperID: String?
-    var overview: String?
-    var developer: String?
-    var publisher: String?
-    var genre: String?
-    var releaseDate: String?
-    var players: String?
-    var rating: Double?
-    var boxArtFile: String?
-    var screenshotFile: String?
-    var titleScreenFile: String?
-    var logoFile: String?
-    var fanartFile: String?
+public nonisolated struct GameRecord: Codable, Sendable, Hashable {
+    public var id: UUID
+    public var path: String
+    public var systemID: String
+    public var title: String
+    public var fileName: String
+    public var fileSize: Int64
+    public var crc32: String?
+    public var fileModified: Date?
+    public var dateAdded: Date
+    public var lastPlayed: Date?
+    public var playCount: Int
+    public var playTime: Double
+    public var isFavorite: Bool
+    public var coreID: String?
+    public var missingSince: Date?
+    public var scrapeState: String
+    public var screenScraperID: String?
+    public var overview: String?
+    public var developer: String?
+    public var publisher: String?
+    public var genre: String?
+    public var releaseDate: String?
+    public var players: String?
+    public var rating: Double?
+    public var boxArtFile: String?
+    public var screenshotFile: String?
+    public var titleScreenFile: String?
+    public var logoFile: String?
+    public var fanartFile: String?
     // Added with schema version 3; optional so older backups still decode.
-    var systemOverride: String?
-    var lockedFields: String?
-    var isHidden: Bool?
-    var coreOptions: Data?
-    var inputProfile: Data?
+    public var systemOverride: String?
+    public var lockedFields: String?
+    public var isHidden: Bool?
+    public var coreOptions: Data?
+    public var inputProfile: Data?
     // Added with schema version 4.
-    var collections: [String]?
-    var playStatus: String?
-    var isPreferredVariant: Bool?
+    public var collections: [String]?
+    public var playStatus: String?
+    public var isPreferredVariant: Bool?
 
-    var saveBaseName: String { (fileName as NSString).deletingPathExtension }
+    public init(id: UUID, path: String, systemID: String, title: String, fileName: String, fileSize: Int64,
+                crc32: String? = nil, fileModified: Date? = nil, dateAdded: Date, lastPlayed: Date? = nil,
+                playCount: Int, playTime: Double, isFavorite: Bool, coreID: String? = nil, missingSince: Date? = nil,
+                scrapeState: String, screenScraperID: String? = nil, overview: String? = nil, developer: String? = nil,
+                publisher: String? = nil, genre: String? = nil, releaseDate: String? = nil, players: String? = nil,
+                rating: Double? = nil, boxArtFile: String? = nil, screenshotFile: String? = nil,
+                titleScreenFile: String? = nil, logoFile: String? = nil, fanartFile: String? = nil,
+                systemOverride: String? = nil, lockedFields: String? = nil, isHidden: Bool? = nil,
+                coreOptions: Data? = nil, inputProfile: Data? = nil, collections: [String]? = nil,
+                playStatus: String? = nil, isPreferredVariant: Bool? = nil) {
+        self.id = id
+        self.path = path
+        self.systemID = systemID
+        self.title = title
+        self.fileName = fileName
+        self.fileSize = fileSize
+        self.crc32 = crc32
+        self.fileModified = fileModified
+        self.dateAdded = dateAdded
+        self.lastPlayed = lastPlayed
+        self.playCount = playCount
+        self.playTime = playTime
+        self.isFavorite = isFavorite
+        self.coreID = coreID
+        self.missingSince = missingSince
+        self.scrapeState = scrapeState
+        self.screenScraperID = screenScraperID
+        self.overview = overview
+        self.developer = developer
+        self.publisher = publisher
+        self.genre = genre
+        self.releaseDate = releaseDate
+        self.players = players
+        self.rating = rating
+        self.boxArtFile = boxArtFile
+        self.screenshotFile = screenshotFile
+        self.titleScreenFile = titleScreenFile
+        self.logoFile = logoFile
+        self.fanartFile = fanartFile
+        self.systemOverride = systemOverride
+        self.lockedFields = lockedFields
+        self.isHidden = isHidden
+        self.coreOptions = coreOptions
+        self.inputProfile = inputProfile
+        self.collections = collections
+        self.playStatus = playStatus
+        self.isPreferredVariant = isPreferredVariant
+    }
+
+    public var saveBaseName: String { (fileName as NSString).deletingPathExtension }
 }
 
 /// `manifest.json`: identifies a backup and lists every file in it, so an
 /// incomplete or damaged backup is noticed before anything is restored.
-nonisolated struct BackupManifest: Codable, Sendable {
-    static let formatName = "atrium-backup"
+public nonisolated struct BackupManifest: Codable, Sendable {
+    public static let formatName = "atrium-backup"
     /// Backups made while the app was called Ursprung.
-    static let legacyFormatNames: Set<String> = ["ursprung-backup"]
-    static let currentVersion = 1
+    public static let legacyFormatNames: Set<String> = ["ursprung-backup"]
+    public static let currentVersion = 1
 
-    struct Entry: Codable, Sendable, Hashable {
-        var path: String
-        var size: Int64
+    public struct Entry: Codable, Sendable, Hashable {
+        public var path: String
+        public var size: Int64
     }
 
-    var format = BackupManifest.formatName
-    var version = BackupManifest.currentVersion
-    var created: Date
-    var appVersion: String
-    var gameCount: Int
-    var files: [Entry]
+    public var format = BackupManifest.formatName
+    public var version = BackupManifest.currentVersion
+    public var created: Date
+    public var appVersion: String
+    public var gameCount: Int
+    public var files: [Entry]
 }
 
 /// A backup is a zip archive with one folder:
@@ -100,21 +149,21 @@ nonisolated struct BackupManifest: Codable, Sendable {
 ///       Shaders/         the user's own shader presets (`Shaders/User/`)
 ///
 /// BIOS files, cores and the downloaded shader pack are not included. See docs/SAVES.md.
-nonisolated enum Backup {
-    static let folderName = "Atrium Backup"
+public nonisolated enum Backup {
+    public static let folderName = "Atrium Backup"
 
-    enum BackupError: LocalizedError {
+    public enum BackupError: LocalizedError {
         case notABackup
         case newerVersion
         case incomplete(missing: Int)
         case damaged(Error)
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
-            case .notABackup: String(localized: "The file is not an Atrium backup.")
-            case .newerVersion: String(localized: "The backup was made by a newer version of Atrium. Update Atrium to restore it.")
-            case .incomplete(let missing): String(localized: "The backup is incomplete: \(missing) files are missing or have the wrong size. Nothing was restored.")
-            case .damaged(let error): String(localized: "The backup is damaged. Nothing was restored. \(error.localizedDescription)")
+            case .notABackup: String(localized: "The file is not an Atrium backup.", bundle: .module)
+            case .newerVersion: String(localized: "The backup was made by a newer version of Atrium. Update Atrium to restore it.", bundle: .module)
+            case .incomplete(let missing): String(localized: "The backup is incomplete: \(missing) files are missing or have the wrong size. Nothing was restored.", bundle: .module)
+            case .damaged(let error): String(localized: "The backup is damaged. Nothing was restored. \(error.localizedDescription)", bundle: .module)
             }
         }
     }
@@ -124,8 +173,8 @@ nonisolated enum Backup {
     /// Writes a backup of `records`, `settings` and the data folders to
     /// `destination`. The archive is assembled next to the destination and
     /// only replaces it when complete.
-    static func create(records: [GameRecord], settings: Data, locations: DataLocations, destination: URL,
-                       appVersion: String, created: Date = .now) throws {
+    public static func create(records: [GameRecord], settings: Data, locations: DataLocations, destination: URL,
+                              appVersion: String, created: Date = .now) throws {
         let fileManager = FileManager.default
         let staging = fileManager.temporaryDirectory.appending(path: "AtriumBackup-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? fileManager.removeItem(at: staging) }
@@ -181,19 +230,19 @@ nonisolated enum Backup {
     // MARK: Opening
 
     /// An extracted, verified backup. `remove()` deletes the extracted files.
-    struct Contents: Sendable {
-        let manifest: BackupManifest
-        let records: [GameRecord]
-        let settings: Data?
+    public struct Contents: Sendable {
+        public let manifest: BackupManifest
+        public let records: [GameRecord]
+        public let settings: Data?
         /// The extracted backup folder (with manifest.json).
-        let root: URL
+        public let root: URL
         /// The temporary folder that holds `root`.
-        let temporary: URL
+        public let temporary: URL
 
-        var batterySaveCount: Int { count(in: "Saves") { _ in true } }
-        var stateCount: Int { count(in: "States") { $0.hasSuffix(".state") || $0.hasSuffix(".p2s") } }
+        public var batterySaveCount: Int { count(in: "Saves") { _ in true } }
+        public var stateCount: Int { count(in: "States") { $0.hasSuffix(".state") || $0.hasSuffix(".p2s") } }
 
-        func remove() {
+        public func remove() {
             try? FileManager.default.removeItem(at: temporary)
         }
 
@@ -205,7 +254,7 @@ nonisolated enum Backup {
     /// Extracts and checks the backup at `archive`. Throws when it is not a
     /// backup, comes from a newer version, or misses or garbles any file it
     /// lists; nothing has been restored at that point.
-    static func open(_ archive: URL) throws -> Contents {
+    public static func open(_ archive: URL) throws -> Contents {
         let fileManager = FileManager.default
         let temporary = fileManager.temporaryDirectory.appending(path: "AtriumRestore-\(UUID().uuidString)", directoryHint: .isDirectory)
         do {
@@ -252,28 +301,37 @@ nonisolated enum Backup {
     // MARK: Restoring
 
     /// What the library knows about a game, to match backup records against.
-    struct ExistingGame: Sendable {
-        let id: UUID
-        let path: String
-        let systemID: String
-        let crc32: String?
-        let fileName: String
-        let fileSize: Int64
+    public struct ExistingGame: Sendable {
+        public let id: UUID
+        public let path: String
+        public let systemID: String
+        public let crc32: String?
+        public let fileName: String
+        public let fileSize: Int64
+
+        public init(id: UUID, path: String, systemID: String, crc32: String?, fileName: String, fileSize: Int64) {
+            self.id = id
+            self.path = path
+            self.systemID = systemID
+            self.crc32 = crc32
+            self.fileName = fileName
+            self.fileSize = fileSize
+        }
     }
 
     /// Where a backup record goes.
-    struct Target: Sendable, Equatable {
+    public struct Target: Sendable, Equatable {
         /// The library entry that receives the record's data.
-        let id: UUID
+        public let id: UUID
         /// True when the record becomes a new library entry.
-        let isNew: Bool
+        public let isNew: Bool
     }
 
     /// Matches every record to a game of the library: the same entry (ID),
     /// the same file (path), or the same game by unique checksum or unique
     /// file name and size. Unmatched records become new entries, keeping their
     /// ID where it is free.
-    static func plan(records: [GameRecord], existing: [ExistingGame]) -> [UUID: Target] {
+    public static func plan(records: [GameRecord], existing: [ExistingGame]) -> [UUID: Target] {
         var available = existing
         let existingIDs = Set(existing.map(\.id))
         let ownerOfPath = Dictionary(existing.map { ($0.path, $0.id) }, uniquingKeysWith: { first, _ in first })
@@ -315,24 +373,31 @@ nonisolated enum Backup {
     /// The order in which the records' own settings count when several join
     /// one game: the game's own record (the same ID) first, then the backup's
     /// order.
-    static func settingsPrecedence(records: [GameRecord], plan: [UUID: Target]) -> [UUID] {
+    public static func settingsPrecedence(records: [GameRecord], plan: [UUID: Target]) -> [UUID] {
         let own = records.filter { plan[$0.id]?.id == $0.id }
         return (own + records.filter { plan[$0.id]?.id != $0.id }).map(\.id)
     }
 
     /// A battery save that has to take the name of the game it joins.
-    struct Rename: Sendable {
-        let systemID: String
-        let recordID: UUID
-        let from: String
-        let to: String
+    public struct Rename: Sendable {
+        public let systemID: String
+        public let recordID: UUID
+        public let from: String
+        public let to: String
+
+        public init(systemID: String, recordID: UUID, from: String, to: String) {
+            self.systemID = systemID
+            self.recordID = recordID
+            self.from = from
+            self.to = to
+        }
     }
 
     /// Restores the backup's files for `plan`. Saves and states are merged
     /// without losing any file (see `FileMerge`); artwork only fills in what
     /// is missing. The extracted files are moved, not copied.
-    static func restoreFiles(of contents: Contents, plan: [UUID: Target], renames: [Rename],
-                             locations: DataLocations, now: Date = .now) throws -> FileMerge.Report {
+    public static func restoreFiles(of contents: Contents, plan: [UUID: Target], renames: [Rename],
+                                    locations: DataLocations, now: Date = .now) throws -> FileMerge.Report {
         let fileManager = FileManager.default
         let ids = Dictionary(plan.map { ($0.key.uuidString, $0.value.id.uuidString) }, uniquingKeysWith: { first, _ in first })
         let mapComponent = { (component: String) in ids[component] ?? component }
@@ -351,8 +416,8 @@ nonisolated enum Backup {
             }
         }
 
-        let labels = FileMerge.Labels(existing: String(localized: "before restore \(FileMerge.stamp(now))"),
-                                      incoming: String(localized: "from backup \(FileMerge.stamp(contents.manifest.created))"))
+        let labels = FileMerge.Labels(existing: String(localized: "before restore \(FileMerge.stamp(now))", bundle: .module),
+                                      incoming: String(localized: "from backup \(FileMerge.stamp(contents.manifest.created))", bundle: .module))
         var report = FileMerge.Report()
         for (name, destination) in [("Saves", locations.saves), ("States", locations.states), ("Extras", locations.extras)] {
             let source = contents.root.appending(path: name, directoryHint: .isDirectory)

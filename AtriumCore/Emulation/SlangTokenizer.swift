@@ -4,8 +4,8 @@ import Foundation
 
 /// Splits slang (GLSL 4.50 with RetroArch pragmas) into the ranges the
 /// source editor colours. Ranges are UTF-16 based, like `NSString`.
-nonisolated enum SlangTokenizer {
-    enum Kind: Hashable, Sendable {
+public nonisolated enum SlangTokenizer {
+    public enum Kind: Hashable, Sendable {
         case comment
         case keyword
         case type
@@ -20,12 +20,12 @@ nonisolated enum SlangTokenizer {
         case string
     }
 
-    struct Token: Hashable, Sendable {
-        let kind: Kind
-        let range: NSRange
+    public struct Token: Hashable, Sendable {
+        public let kind: Kind
+        public let range: NSRange
     }
 
-    static func tokens(in text: String) -> [Token] {
+    public static func tokens(in text: String) -> [Token] {
         let units = Array(text.utf16)
         var tokens: [Token] = []
         var index = 0

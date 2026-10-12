@@ -13,26 +13,26 @@ import Foundation
 /// The scanner recognises the system folders by name (`GameSystem.folderName`).
 /// BIOS lies next to ROMs, not inside, so its files never show up as
 /// unrecognized games. Existing folders and files are never replaced.
-nonisolated enum FolderStructure {
-    static let rootName = "Atrium"
-    static let romsName = "ROMs"
-    static let biosName = "BIOS"
+public nonisolated enum FolderStructure {
+    public static let rootName = "Atrium"
+    public static let romsName = "ROMs"
+    public static let biosName = "BIOS"
 
     /// `~/Atrium`: not in Documents, which iCloud may sync.
-    static var defaultRoot: URL {
+    public static var defaultRoot: URL {
         FileManager.default.homeDirectoryForCurrentUser.appending(path: rootName, directoryHint: .isDirectory)
     }
 
-    static func roms(in root: URL) -> URL { root.appending(path: romsName, directoryHint: .isDirectory) }
-    static func bios(in root: URL) -> URL { root.appending(path: biosName, directoryHint: .isDirectory) }
+    public static func roms(in root: URL) -> URL { root.appending(path: romsName, directoryHint: .isDirectory) }
+    public static func bios(in root: URL) -> URL { root.appending(path: biosName, directoryHint: .isDirectory) }
 
-    static var readMeName: String { String(localized: "Read Me.txt") }
+    public static var readMeName: String { String(localized: "Read Me.txt", bundle: .module) }
 
     /// Creates what is missing below `root`: the ROMs and BIOS folders, the
     /// read me and a folder for every system in `systems`. Returns the IDs
     /// of the systems the structure now has folders for.
     @discardableResult
-    static func create(at root: URL, systems: [GameSystem] = SystemCatalog.all) throws -> Set<String> {
+    public static func create(at root: URL, systems: [GameSystem] = SystemCatalog.all) throws -> Set<String> {
         let fm = FileManager.default
         try fm.createDirectory(at: bios(in: root), withIntermediateDirectories: true)
         try createSystemFolders(systems, in: roms(in: root))
@@ -47,8 +47,8 @@ nonisolated enum FolderStructure {
     /// folder. Folders the user deleted stay deleted, and nothing happens
     /// while the structure is gone or on a drive that is not connected.
     /// Returns `laidOut` with the systems added.
-    static func addNewSystems(at root: URL, laidOut: Set<String>,
-                              systems: [GameSystem] = SystemCatalog.all) throws -> Set<String> {
+    public static func addNewSystems(at root: URL, laidOut: Set<String>,
+                                     systems: [GameSystem] = SystemCatalog.all) throws -> Set<String> {
         let roms = roms(in: root)
         let new = systems.filter { !laidOut.contains($0.id) }
         guard !new.isEmpty, FileManager.default.fileExists(atPath: roms.path(percentEncoded: false)) else { return laidOut }
@@ -83,6 +83,6 @@ nonisolated enum FolderStructure {
         them. Settings › BIOS shows which ones are still missing.
 
         Folders you don't need can be deleted. Only use games and BIOS files from hardware you own.
-        """)
+        """, bundle: .module)
     }
 }

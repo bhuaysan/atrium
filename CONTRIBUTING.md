@@ -49,7 +49,8 @@ Useful commands:
 - Prefer system frameworks over dependencies. The project currently has none,
   and new ones need a very good reason.
 - All user-facing strings must be localizable (`Text("…")`, `String(localized:)`).
-  If you can, add the German translation to `Atrium/Resources/Localizable.xcstrings`.
+  If you can, add the German translation to `Atrium/Resources/Localizable.xcstrings`
+  (or `AtriumCore/Resources/Localizable.xcstrings` for code in `AtriumCore`).
 
 The libretro host (`Atrium/Bridge/`) is Objective-C/C on purpose: libretro
 callbacks are C function pointers (one of them variadic), and the hot paths
@@ -78,7 +79,7 @@ in real time, needed for cores such as PPSSPP that boot asynchronously) and
 1. Find a libretro core that is built for `apple/osx/arm64` on the
    [buildbot](https://buildbot.libretro.com/nightly/apple/osx/arm64/latest/).
 2. Add a `CoreDefinition` to `Cores` and a `GameSystem` entry to
-   `SystemCatalog.all` in `Atrium/Systems/SystemCatalog.swift`: extensions,
+   `SystemCatalog.all` in `AtriumCore/Systems/SystemCatalog.swift`: extensions,
    folder aliases, the ScreenScraper system ID
    ([`systemesListe`](https://www.screenscraper.fr/webapi2.php)), BIOS files with
    MD5 checksums, and any frontend defaults for core options.

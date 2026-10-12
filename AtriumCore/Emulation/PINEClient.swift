@@ -13,8 +13,8 @@ import Foundation
 ///
 /// Save and load are acknowledged once ARMSX2 has queued them, not when they
 /// are done; `ARMSX2States` waits for the file a save writes.
-nonisolated struct PINEClient: Sendable, Hashable {
-    enum Opcode: UInt8, Sendable {
+public nonisolated struct PINEClient: Sendable, Hashable {
+    public enum Opcode: UInt8, Sendable {
         case version = 0x08
         case saveState = 0x09
         case loadState = 0x0A
@@ -27,16 +27,16 @@ nonisolated struct PINEClient: Sendable, Hashable {
         case stats = 0x10
     }
 
-    enum Status: UInt32, Sendable {
+    public enum Status: UInt32, Sendable {
         case running = 0
         case paused = 1
         case shutdown = 2
     }
 
-    nonisolated struct Stats: Decodable, Sendable {
-        let fps: Double
+    public nonisolated struct Stats: Decodable, Sendable {
+        public let fps: Double
         /// Frames the game has drawn; above 0 once it shows something.
-        let frameNumber: Int
+        public let frameNumber: Int
 
         enum CodingKeys: String, CodingKey {
             case fps
@@ -44,7 +44,7 @@ nonisolated struct PINEClient: Sendable, Hashable {
         }
     }
 
-    enum Failure: Error, Equatable {
+    public enum Failure: Error, Equatable {
         /// No socket, or nothing listens on it.
         case unreachable
         case timedOut
@@ -53,56 +53,61 @@ nonisolated struct PINEClient: Sendable, Hashable {
         case malformedReply
     }
 
-    let socket: URL
+    public let socket: URL
     /// How long a request may take before it counts as unanswered.
-    var timeout: Duration = .seconds(3)
+    public var timeout: Duration = .seconds(3)
+
+    public init(socket: URL, timeout: Duration = .seconds(3)) {
+        self.socket = socket
+        self.timeout = timeout
+    }
 
     // MARK: Commands
 
     /// “ARMSX2 <commit>”.
-    @concurrent func version() async throws -> String {
+    @concurrent public func version() async throws -> String {
         try string(in: send(.version))
     }
 
-    @concurrent func title() async throws -> String {
+    @concurrent public func title() async throws -> String {
         try string(in: send(.title))
     }
 
     /// The running disc's serial, e.g. `SLES-55474`.
-    @concurrent func serial() async throws -> String {
+    @concurrent public func serial() async throws -> String {
         try string(in: send(.serial))
     }
 
     /// The running disc's CRC, e.g. `117d1977`.
-    @concurrent func discCRC() async throws -> String {
+    @concurrent public func discCRC() async throws -> String {
         try string(in: send(.discCRC))
     }
 
-    @concurrent func status() async throws -> Status {
+    @concurrent public func status() async throws -> Status {
         let payload = try send(.status)
         guard payload.count >= 4, let status = Status(rawValue: payload.uint32(at: 0)) else { throw Failure.malformedReply }
         return status
     }
 
-    @concurrent func stats() async throws -> Stats {
+    @concurrent public func stats() async throws -> Stats {
         let json = try string(in: send(.stats))
         guard let stats = try? JSONDecoder().decode(Stats.self, from: Data(json.utf8)) else { throw Failure.malformedReply }
         return stats
     }
 
     /// Asks ARMSX2 to save into `slot`; it writes the state afterwards.
-    @concurrent func saveState(slot: UInt8) async throws {
+    @concurrent public func saveState(slot: UInt8) async throws {
         _ = try send(.saveState, arguments: [slot])
     }
 
     /// Asks ARMSX2 to load `slot`. A failure only shows in ARMSX2's window.
-    @concurrent func loadState(slot: UInt8) async throws {
+    @concurrent public func loadState(slot: UInt8) async throws {
         _ = try send(.loadState, arguments: [slot])
     }
 
     /// Retries `version` until ARMSX2 answers: its socket appears about two
     /// seconds after launch. Throws the last failure after `timeout`.
-    @concurrent func waitUntilReady(timeout: Duration, interval: Duration = .milliseconds(250)) async throws -> String {
+    @concurrent public func waitUntilReady(timeout: Duration, interval: Duration = .milliseconds(250)) async throws -> String {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
         while true {
@@ -118,13 +123,13 @@ nonisolated struct PINEClient: Sendable, Hashable {
     // MARK: Wire format
 
     /// The request for `opcode`, framed with its size.
-    static func message(_ opcode: Opcode, arguments: [UInt8] = []) -> Data {
+    public static func message(_ opcode: Opcode, arguments: [UInt8] = []) -> Data {
         let size = UInt32(4 + 1 + arguments.count)
         return withUnsafeBytes(of: size.littleEndian) { Data($0) } + [opcode.rawValue] + arguments
     }
 
     /// A string payload: `u32` length, then the bytes with a trailing NUL.
-    func string(in payload: Data) throws -> String {
+    public func string(in payload: Data) throws -> String {
         guard payload.count >= 4 else { throw Failure.malformedReply }
         let length = Int(payload.uint32(at: 0))
         guard length <= payload.count - 4 else { throw Failure.malformedReply }
@@ -133,7 +138,7 @@ nonisolated struct PINEClient: Sendable, Hashable {
     }
 
     /// Sends one request and returns the reply's payload (blocking).
-    func send(_ opcode: Opcode, arguments: [UInt8] = []) throws -> Data {
+    public func send(_ opcode: Opcode, arguments: [UInt8] = []) throws -> Data {
         let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         guard descriptor >= 0 else { throw Failure.unreachable }
         defer { close(descriptor) }

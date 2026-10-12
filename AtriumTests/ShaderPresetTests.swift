@@ -5,6 +5,7 @@ import Metal
 import MetalKit
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 /// A one-pass slang shader with one parameter.
 let dimShader = """

@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 nonisolated private let labels = FileMerge.Labels(existing: "before 2026-10-03 12.00.00", incoming: "from 2026-10-01 12.00.00")
 
