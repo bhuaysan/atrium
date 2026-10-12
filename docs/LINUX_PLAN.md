@@ -289,6 +289,8 @@ Estimates are for one developer and assume the spikes don't reveal a blocker; Ph
 - Tests: `CoreManagerTests` and `ZipRobustnessTests` moved; the shared helpers are `AtriumCoreTests/Fixtures.swift`, which `AtriumTests` compiles too. Mixed test files stay in `AtriumTests` with `@testable import AtriumCore` and move with the code they test.
 **Step 2 — saves (12 October 2026).** `BatterySave` (with `PS2MemoryCard`), `SaveStates` and `ARMSX2States` moved, and `StandaloneLaunchError` out of `ARMSX2Launch` into its own file. For that, the memory card's file name moved from `PCSX2Config` to `PS2MemoryCard.fileName`, and `StateRenderer(GraphicsAPI)` joined the app's `GraphicsAPI` mappings (`Atrium/Emulation/GraphicsAPI+Renderers.swift`). `BackupTests`, `BatterySaveTests`, `PINEClientTests` and `SaveFilesTests` moved to `AtriumCoreTests`; `armsx2StateFiles` joined the shared fixtures.
 
+**Step 3 — keys (12 October 2026, H9).** Keys are `KeyboardKey` in AtriumCore: a key by position, named like the W3C `KeyboardEvent.code` values (`KeyA`, `ArrowUp`, `ShiftRight`). `KeyBinding` (now in AtriumCore) saves `{"key": "ArrowUp", "label": "↑"}`; one saved before reads its macOS key code through `KeyboardKey(macKeyCode:)` and is saved in the new form the next time. That covers the preferences, games' own controls and backups, also when a Mac backup is restored on Linux. The `RETROK_*` table (`EmulatedKeyboard.retroKey(for:)`) moved to AtriumCore; `HotKey`'s key code constants are gone. The app turns events into keys with `NSEvent.keyboardKey`; `ARMSX2Keys` names keys by `KeyboardKey` and still reads the layout with Carbon. Linux needs a table from evdev codes (GTK's hardware key code − 8) to `KeyboardKey` (Phase 2).
+
 - Still Apple-only inside the package, for Phase 1 (H10): `Compression` in `ZipArchive`, `Security` in `Keychain`/`LegacyName`, `zlib` imported as the SDK's module.
 
 **What holds back the rest** (found by compiling candidate sets on their own):
@@ -297,7 +299,7 @@ Estimates are for one developer and assume the spikes don't reveal a blocker; Ph
 |---|---|---|
 | Bridge types (`ShaderPreset`, `ShaderParameter`, `RetroInput`, `PadState`, `GraphicsAPI`, `AchievementClient`) | `ShaderIndex`, `ShaderPresetWriter`, `SlangPreset`, `SlangSource`, `ShaderDrafts`, `ShaderLibrary`, `ShaderWorkspace`, `InputMapping`, `InputProfile`, `HIDGamepadMapping`, `AchievementService` | `LibretroHost` in C (H1) |
 | `Game`/`PlayStatus` (SwiftData) | `DiscPlaylist`, `LibraryCollections`, `LibraryFilter`, then `LibraryScanner` (also `LibraryPaths`), `LibraryMatcher`, `GameVariants` (`TitleFormatter`) | `LibraryStore` split (H4) |
-| macOS key codes (`ARMSX2Controls`) | `PCSX2Config`, `ARMSX2Launch` | Key identifiers (H9) |
+| The bridge's `RetroButton` in `RetroInput.button` and `PadState` | `InputMapping`, `InputProfile` and through them `ARMSX2Controls` (its layout reading with Carbon stays in the app), `PCSX2Config`, `ARMSX2Launch` | `LibretroHost` in C (H1), or the `GraphicsAPI` approach: the mapping to the bridge type stays in the app |
 | Generated `GeneratedSecrets`, `Keychain` protocol | `Secrets`, `ScreenScraperClient` | Secret store protocol |
 
 ## Decisions

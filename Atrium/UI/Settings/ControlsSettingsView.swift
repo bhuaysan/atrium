@@ -175,13 +175,14 @@ struct ControlsSettingsView: View {
         listeningHotkey = action
         hotkeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
             guard let target = listeningHotkey else { return event }
-            if event.keyCode == HotKey.escape, target != .menu {
+            guard let key = event.keyboardKey else { return nil }
+            if key == .escape, target != .menu {
                 stopListeningHotkey()
                 return nil
             }
             // A key does one thing: it leaves any other hotkey.
-            for (other, binding) in hotkeys.bindings where binding.keyCode == event.keyCode { hotkeys.bindings[other] = nil }
-            hotkeys.bindings[target] = KeyBinding(keyCode: event.keyCode, label: KeyLabel.label(for: event))
+            for (other, binding) in hotkeys.bindings where binding.key == key { hotkeys.bindings[other] = nil }
+            hotkeys.bindings[target] = KeyBinding(key: key, label: KeyLabel.label(for: event))
             saveHotkeys()
             stopListeningHotkey()
             return nil
@@ -281,8 +282,9 @@ struct InputTestView: View {
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { event in
                 // A running game would receive the keys too.
                 guard !session.isActive else { return event }
-                if event.type == .keyDown, !event.isARepeat { session.input.keyDown(event.keyCode) }
-                if event.type == .keyUp { session.input.keyUp(event.keyCode) }
+                guard let key = event.keyboardKey else { return event }
+                if event.type == .keyDown, !event.isARepeat { session.input.keyDown(key) }
+                if event.type == .keyUp { session.input.keyUp(key) }
                 return event
             }
         }

@@ -47,7 +47,7 @@ final class GameMTKView: MTKView {
     weak var session: EmulationSession?
     var renderer: MetalRenderer?
 
-    private var pressedModifiers = Set<UInt16>()
+    private var pressedModifiers = Set<KeyboardKey>()
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -65,7 +65,8 @@ final class GameMTKView: MTKView {
             return
         }
         NSCursor.setHiddenUntilMouseMoves(true)
-        let action = session.input.hotkeys.action(forKeyCode: event.keyCode)
+        let key = event.keyboardKey
+        let action = key.flatMap(session.input.hotkeys.action(for:))
         if session.isTyping {
             // Every key types on the emulated computer, except the one that ends typing.
             if action == .typing, !event.isARepeat { session.toggleTyping() } else { session.typeKey(event, isDown: true) }
@@ -83,7 +84,7 @@ final class GameMTKView: MTKView {
         case .turbo: session.toggleTurbo()
         case .typing: session.toggleTyping()
         case .shaderPanel: session.toggleShaderPanel()
-        case nil: session.input.keyDown(event.keyCode)
+        case nil: if let key { session.input.keyDown(key) }
         }
     }
 
@@ -93,26 +94,28 @@ final class GameMTKView: MTKView {
             session.typeKey(event, isDown: false)
             return
         }
-        switch session.input.hotkeys.action(forKeyCode: event.keyCode) {
+        guard let key = event.keyboardKey else { return }
+        switch session.input.hotkeys.action(for: key) {
         case .fastForward: session.setFastForward(false)
         case .rewind: session.setRewinding(false)
-        default: session.input.keyUp(event.keyCode)
+        default: session.input.keyUp(key)
         }
     }
 
     /// Modifier keys (e.g. right shift for Select) only report flag changes.
     override func flagsChanged(with event: NSEvent) {
         guard let session else { return }
-        let code = event.keyCode
+        let key = event.keyboardKey
         if session.isTyping {
-            session.typeKey(event, isDown: EmulatedKeyboard.isModifierDown(keyCode: code, flags: event.modifierFlags))
+            session.typeKey(event, isDown: EmulatedKeyboard.isModifierDown(key, flags: event.modifierFlags))
             return
         }
-        if pressedModifiers.remove(code) != nil {
-            session.input.keyUp(code)
+        guard let key else { return }
+        if pressedModifiers.remove(key) != nil {
+            session.input.keyUp(key)
         } else {
-            pressedModifiers.insert(code)
-            session.input.keyDown(code)
+            pressedModifiers.insert(key)
+            session.input.keyDown(key)
         }
     }
 

@@ -113,40 +113,35 @@ nonisolated struct PadState: Equatable, Sendable {
     }
 }
 
-nonisolated struct KeyBinding: Codable, Hashable, Sendable {
-    var keyCode: UInt16
-    var label: String
-}
-
 /// Keyboard layout for player 1. Defaults follow RetroArch conventions.
 nonisolated struct KeyboardMapping: Codable, Equatable, Sendable {
     var bindings: [RetroInput: KeyBinding]
 
     static let standard = KeyboardMapping(bindings: [
-        .up: KeyBinding(keyCode: 126, label: "↑"),
-        .down: KeyBinding(keyCode: 125, label: "↓"),
-        .left: KeyBinding(keyCode: 123, label: "←"),
-        .right: KeyBinding(keyCode: 124, label: "→"),
-        .a: KeyBinding(keyCode: 7, label: "X"),
-        .b: KeyBinding(keyCode: 6, label: "Z"),
-        .x: KeyBinding(keyCode: 1, label: "S"),
-        .y: KeyBinding(keyCode: 0, label: "A"),
-        .l: KeyBinding(keyCode: 12, label: "Q"),
-        .r: KeyBinding(keyCode: 13, label: "W"),
-        .l2: KeyBinding(keyCode: 14, label: "E"),
-        .r2: KeyBinding(keyCode: 15, label: "R"),
-        .l3: KeyBinding(keyCode: 18, label: "1"),
-        .r3: KeyBinding(keyCode: 19, label: "2"),
-        .start: KeyBinding(keyCode: 36, label: "↩"),
-        .select: KeyBinding(keyCode: 60, label: "⇧ right"),
-        .leftStickUp: KeyBinding(keyCode: 34, label: "I"),
-        .leftStickDown: KeyBinding(keyCode: 40, label: "K"),
-        .leftStickLeft: KeyBinding(keyCode: 38, label: "J"),
-        .leftStickRight: KeyBinding(keyCode: 37, label: "L"),
-        .rightStickUp: KeyBinding(keyCode: 17, label: "T"),
-        .rightStickDown: KeyBinding(keyCode: 5, label: "G"),
-        .rightStickLeft: KeyBinding(keyCode: 3, label: "F"),
-        .rightStickRight: KeyBinding(keyCode: 4, label: "H"),
+        .up: KeyBinding(key: .arrowUp, label: "↑"),
+        .down: KeyBinding(key: .arrowDown, label: "↓"),
+        .left: KeyBinding(key: .arrowLeft, label: "←"),
+        .right: KeyBinding(key: .arrowRight, label: "→"),
+        .a: KeyBinding(key: .keyX, label: "X"),
+        .b: KeyBinding(key: .keyZ, label: "Z"),
+        .x: KeyBinding(key: .keyS, label: "S"),
+        .y: KeyBinding(key: .keyA, label: "A"),
+        .l: KeyBinding(key: .keyQ, label: "Q"),
+        .r: KeyBinding(key: .keyW, label: "W"),
+        .l2: KeyBinding(key: .keyE, label: "E"),
+        .r2: KeyBinding(key: .keyR, label: "R"),
+        .l3: KeyBinding(key: .digit1, label: "1"),
+        .r3: KeyBinding(key: .digit2, label: "2"),
+        .start: KeyBinding(key: .enter, label: "↩"),
+        .select: KeyBinding(key: .shiftRight, label: "⇧ right"),
+        .leftStickUp: KeyBinding(key: .keyI, label: "I"),
+        .leftStickDown: KeyBinding(key: .keyK, label: "K"),
+        .leftStickLeft: KeyBinding(key: .keyJ, label: "J"),
+        .leftStickRight: KeyBinding(key: .keyL, label: "L"),
+        .rightStickUp: KeyBinding(key: .keyT, label: "T"),
+        .rightStickDown: KeyBinding(key: .keyG, label: "G"),
+        .rightStickLeft: KeyBinding(key: .keyF, label: "F"),
+        .rightStickRight: KeyBinding(key: .keyH, label: "H"),
     ])
 
     static var current: KeyboardMapping {
@@ -160,19 +155,7 @@ nonisolated struct KeyboardMapping: Codable, Equatable, Sendable {
         }
     }
 
-    func input(forKeyCode keyCode: UInt16) -> [RetroInput] {
-        bindings.filter { $0.value.keyCode == keyCode }.map(\.key)
+    func input(for key: KeyboardKey) -> [RetroInput] {
+        bindings.filter { $0.value.key == key }.map(\.key)
     }
-}
-
-/// Keys handled by the player itself (not remappable).
-nonisolated enum HotKey {
-    static let escape: UInt16 = 53
-    static let fastForward: UInt16 = 49 // Space
-    static let quickSave: UInt16 = 120  // F2
-    static let quickLoad: UInt16 = 118  // F4
-    static let rewind: UInt16 = 51      // Backspace (⌫)
-    static let screenshot: UInt16 = 100 // F8
-    static let typing: UInt16 = 111     // F12
-    static let shaderPanel: UInt16 = 97 // F6
 }

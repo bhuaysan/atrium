@@ -134,14 +134,14 @@ nonisolated struct HotkeyMapping: Codable, Equatable, Sendable {
     var knownActions: Set<HotkeyAction>?
 
     static let standard = HotkeyMapping(bindings: [
-        .menu: KeyBinding(keyCode: HotKey.escape, label: "esc"),
-        .fastForward: KeyBinding(keyCode: HotKey.fastForward, label: String(localized: "Space")),
-        .rewind: KeyBinding(keyCode: HotKey.rewind, label: "⌫"),
-        .quickSave: KeyBinding(keyCode: HotKey.quickSave, label: "F2"),
-        .quickLoad: KeyBinding(keyCode: HotKey.quickLoad, label: "F4"),
-        .screenshot: KeyBinding(keyCode: HotKey.screenshot, label: "F8"),
-        .typing: KeyBinding(keyCode: HotKey.typing, label: "F12"),
-        .shaderPanel: KeyBinding(keyCode: HotKey.shaderPanel, label: "F6"),
+        .menu: KeyBinding(key: .escape, label: "esc"),
+        .fastForward: KeyBinding(key: .space, label: String(localized: "Space")),
+        .rewind: KeyBinding(key: .backspace, label: "⌫"),
+        .quickSave: KeyBinding(key: .f2, label: "F2"),
+        .quickLoad: KeyBinding(key: .f4, label: "F4"),
+        .screenshot: KeyBinding(key: .f8, label: "F8"),
+        .typing: KeyBinding(key: .f12, label: "F12"),
+        .shaderPanel: KeyBinding(key: .f6, label: "F6"),
     ], knownActions: Set(HotkeyAction.allCases))
 
     static var current: HotkeyMapping {
@@ -159,7 +159,7 @@ nonisolated struct HotkeyMapping: Codable, Equatable, Sendable {
         var mapping = self
         for action in HotkeyAction.allCases where !known.contains(action) {
             guard let binding = Self.standard.bindings[action],
-                  !mapping.bindings.values.contains(where: { $0.keyCode == binding.keyCode }) else { continue }
+                  !mapping.bindings.values.contains(where: { $0.key == binding.key }) else { continue }
             mapping.bindings[action] = binding
         }
         mapping.knownActions = Set(HotkeyAction.allCases)
@@ -168,9 +168,9 @@ nonisolated struct HotkeyMapping: Codable, Equatable, Sendable {
 
     /// The action of a key. esc always opens the game menu as well, so a
     /// rebound menu key can never lock the player in.
-    func action(forKeyCode keyCode: UInt16) -> HotkeyAction? {
-        if let action = bindings.first(where: { $0.value.keyCode == keyCode })?.key { return action }
-        return keyCode == HotKey.escape ? .menu : nil
+    func action(for key: KeyboardKey) -> HotkeyAction? {
+        if let action = bindings.first(where: { $0.value.key == key })?.key { return action }
+        return key == .escape ? .menu : nil
     }
 }
 

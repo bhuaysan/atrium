@@ -307,13 +307,13 @@ struct HotkeyAndTurboTests {
     @Test func newHotkeysGetTheirKeysUnlessTaken() throws {
         // Saved before Rewind and Screenshot existed; F8 is already Quick Load.
         let old = HotkeyMapping(bindings: [
-            .menu: KeyBinding(keyCode: HotKey.escape, label: "esc"),
-            .quickLoad: KeyBinding(keyCode: HotKey.screenshot, label: "F8"),
+            .menu: KeyBinding(key: .escape, label: "esc"),
+            .quickLoad: KeyBinding(key: .f8, label: "F8"),
         ], knownActions: nil)
         let mapping = old.addingNewActions()
-        #expect(mapping.bindings[.rewind]?.keyCode == HotKey.rewind)
+        #expect(mapping.bindings[.rewind]?.key == .backspace)
         #expect(mapping.bindings[.screenshot] == nil)
-        #expect(mapping.bindings[.quickLoad]?.keyCode == HotKey.screenshot)
+        #expect(mapping.bindings[.quickLoad]?.key == .f8)
         // Actions the user knew and cleared stay cleared.
         #expect(mapping.bindings[.fastForward] == nil && mapping.bindings[.quickSave] == nil)
 
@@ -335,13 +335,13 @@ struct HotkeyAndTurboTests {
     }
 
     @Test func keysTypeByPosition() {
-        #expect(EmulatedKeyboard.retroKey(forKeyCode: 0x00) == 97)  // A
-        #expect(EmulatedKeyboard.retroKey(forKeyCode: 0x24) == 13)  // Return
-        #expect(EmulatedKeyboard.retroKey(forKeyCode: 0x7E) == 273) // Up
-        #expect(EmulatedKeyboard.retroKey(forKeyCode: 0x6F) == 293) // F12
+        #expect(EmulatedKeyboard.retroKey(for: .keyA) == 97)
+        #expect(EmulatedKeyboard.retroKey(for: .enter) == 13)
+        #expect(EmulatedKeyboard.retroKey(for: .arrowUp) == 273)
+        #expect(EmulatedKeyboard.retroKey(for: .f12) == 293)
         #expect(EmulatedKeyboard.modifiers([.shift, .control]) == 0x03)
-        #expect(EmulatedKeyboard.isModifierDown(keyCode: 0x38, flags: .shift))
-        #expect(!EmulatedKeyboard.isModifierDown(keyCode: 0x38, flags: []))
+        #expect(EmulatedKeyboard.isModifierDown(.shiftLeft, flags: .shift))
+        #expect(!EmulatedKeyboard.isModifierDown(.shiftLeft, flags: []))
     }
 }
 

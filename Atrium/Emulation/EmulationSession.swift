@@ -962,7 +962,7 @@ final class EmulationSession {
 
     /// A key of the emulated computer keyboard, while typing.
     func typeKey(_ event: NSEvent, isDown: Bool) {
-        guard let core, isTyping, let key = EmulatedKeyboard.retroKey(forKeyCode: event.keyCode) else { return }
+        guard let core, isTyping, let key = event.keyboardKey.flatMap(EmulatedKeyboard.retroKey(for:)) else { return }
         let character = isDown && event.type != .flagsChanged ? EmulatedKeyboard.character(of: event) : 0
         core.setKey(key, pressed: isDown, character: character, modifiers: EmulatedKeyboard.modifiers(event.modifierFlags))
     }

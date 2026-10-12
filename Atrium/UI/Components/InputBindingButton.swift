@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import AppKit
+import AtriumCore
 import SwiftUI
 
 /// The button that shows and learns one input binding, shared by the
@@ -98,7 +99,7 @@ private struct ListeningMonitor: NSViewRepresentable {
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
                 guard let self else { return event }
                 switch event.type {
-                case .keyDown where event.keyCode == HotKey.escape:
+                case .keyDown where event.keyboardKey == .escape:
                     // Only the listening ends, not the sheet around it.
                     end?()
                     return nil

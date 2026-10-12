@@ -41,7 +41,7 @@ and [librashader](https://github.com/SnowflakePowered/librashader)
 
 | Path | Purpose |
 |---|---|
-| `Package.swift`, `AtriumCore` | Swift package with the platform-neutral code the Linux port will share (docs/LINUX_PLAN.md): systems catalog, paths, preferences, backup format, ZIP reader, core downloads, battery saves and save states (with ARMSX2's), PINE client, shader selection; its own string catalog in `AtriumCore/Resources` |
+| `Package.swift`, `AtriumCore` | Swift package with the platform-neutral code the Linux port will share (docs/LINUX_PLAN.md): systems catalog, paths, preferences, backup format, ZIP reader, core downloads, battery saves and save states (with ARMSX2's), keyboard keys (`KeyboardKey`, `KeyBinding`), PINE client, shader selection; its own string catalog in `AtriumCore/Resources` |
 | `Atrium/App` | App entry point, scenes, menu commands |
 | `Atrium/Library` | SwiftData `Game` model, folder scanner, `LibraryStore`, ROM patches and per-game extras |
 | `Atrium/Achievements` | RetroAchievements account (`AchievementService`) |

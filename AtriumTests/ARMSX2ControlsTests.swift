@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 @testable import Atrium
+@testable import AtriumCore
 
 extension ARMSX2Controls {
     /// Atrium's default controls on a US keyboard.
@@ -47,7 +48,7 @@ struct ARMSX2ControlsTests {
         var controls = ARMSX2Controls.standardUS
         controls.profile.controller.setSource(.a, for: .b)   // Cross on the right face button
         controls.profile.controller.setSource(nil, for: .select)
-        controls.profile.keyboard.bindings[.start] = KeyBinding(keyCode: 49, label: "Space")  // the Fast Forward key
+        controls.profile.keyboard.bindings[.start] = KeyBinding(key: .space, label: "Space")  // the Fast Forward key
         controls.rumble = false
         controls.deadZone = 0.3
         let pad = controls.pad(player: 0)
@@ -75,9 +76,9 @@ struct ARMSX2ControlsTests {
         #expect(values(hotkeys, "SaveStateToSlot").isEmpty && values(hotkeys, "NextSaveStateSlot").isEmpty)
 
         var controls = ARMSX2Controls.standardUS
-        controls.hotkeys.bindings[.menu] = KeyBinding(keyCode: 12, label: "Q")
+        controls.hotkeys.bindings[.menu] = KeyBinding(key: .keyQ, label: "Q")
         controls.hotkeys.bindings[.fastForward] = nil
-        controls.profile.keyboard.bindings[.start] = KeyBinding(keyCode: 76, label: "⌤")
+        controls.profile.keyboard.bindings[.start] = KeyBinding(key: .numpadEnter, label: "⌤")
         #expect(values(controls.hotkeyEntries, "OpenPauseMenu") == ["Keyboard/Q", "Keyboard/Escape", "SDL-0/Guide", "SDL-1/Guide"])
         #expect(values(controls.pad(player: 0), "L1") == ["SDL-0/LeftShoulder"], "Q opens the menu now")
         #expect(values(controls.hotkeyEntries, "TogglePause") == ["Keyboard/Space"])
@@ -86,21 +87,24 @@ struct ARMSX2ControlsTests {
 
     @Test func namesKeysByTheLayoutsCharacters() {
         let us = ARMSX2Keys.names(layout: [:])
-        #expect(us[6] == "Z" && us[16] == "Y")
-        #expect(us[27] == "Minus" && us[41] == "Semicolon" && us[50] == "QuoteLeft")
-        #expect(us[65] == "NumpadPeriod" && us[82] == "Numpad0" && us[76] == "NumpadEnter")
-        #expect(us[36] == "Return" && us[60] == "Shift" && us[56] == "Shift" && us[55] == "Meta" && us[59] == "Control")
-        #expect(us[122] == "F1" && us[111] == "F12")
+        #expect(us[.keyZ] == "Z" && us[.keyY] == "Y")
+        #expect(us[.minus] == "Minus" && us[.semicolon] == "Semicolon" && us[.backquote] == "QuoteLeft")
+        #expect(us[.numpadDecimal] == "NumpadPeriod" && us[.numpad0] == "Numpad0" && us[.numpadEnter] == "NumpadEnter")
+        #expect(us[.enter] == "Return" && us[.shiftRight] == "Shift" && us[.shiftLeft] == "Shift")
+        #expect(us[.metaLeft] == "Meta" && us[.controlLeft] == "Control")
+        #expect(us[.f1] == "F1" && us[.f12] == "F12")
 
         // German: Y and Z swap, Ö has no name in ARMSX2, ^ is a dead key.
-        let german: [UInt16: Character] = [6: "y", 16: "z", 41: "ö", 30: "+", 44: "-", 10: "<", 42: "#", 65: ","]
+        let german: [KeyboardKey: Character] = [.keyZ: "y", .keyY: "z", .semicolon: "ö", .bracketRight: "+",
+                                                 .slash: "-", .intlBackslash: "<", .backslash: "#", .numpadDecimal: ","]
         let names = ARMSX2Keys.names(layout: german)
-        #expect(names[6] == "Y" && names[16] == "Z")
-        #expect(names[41] == nil)
-        #expect(names[30] == "Plus" && names[44] == "Minus" && names[10] == "Less" && names[42] == "NumberSign")
-        #expect(names[65] == "NumpadComma")
-        #expect(names[50] == nil, "No US fallback for a key the layout doesn't type")
-        #expect(names[36] == "Return")
+        #expect(names[.keyZ] == "Y" && names[.keyY] == "Z")
+        #expect(names[.semicolon] == nil)
+        #expect(names[.bracketRight] == "Plus" && names[.slash] == "Minus")
+        #expect(names[.intlBackslash] == "Less" && names[.backslash] == "NumberSign")
+        #expect(names[.numpadDecimal] == "NumpadComma")
+        #expect(names[.backquote] == nil, "No US fallback for a key the layout doesn't type")
+        #expect(names[.enter] == "Return")
         #expect(ARMSX2Keys.name(of: "ß") == nil)
         #expect(ARMSX2Keys.name(of: "a") == "A" && ARMSX2Keys.name(of: "7") == "7")
     }

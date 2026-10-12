@@ -120,13 +120,26 @@ struct InputMappingTests {
         for input in RetroInput.allCases {
             #expect(KeyboardMapping.standard.bindings[input] != nil, "\(input) is unbound")
         }
-        let codes = KeyboardMapping.standard.bindings.values.map(\.keyCode)
-        #expect(Set(codes).count == codes.count, "Default keys must not overlap")
+        let keys = KeyboardMapping.standard.bindings.values.map(\.key)
+        #expect(Set(keys).count == keys.count, "Default keys must not overlap")
     }
 
     @Test func mappingRoundTripsThroughJSON() throws {
         let data = try JSONEncoder().encode(KeyboardMapping.standard)
         #expect(try JSONDecoder().decode(KeyboardMapping.self, from: data) == .standard)
+    }
+
+    /// Profiles saved before keys were platform-neutral stored macOS key codes.
+    @Test func profileWithMacKeyCodesStillReads() throws {
+        let old = Data(#"""
+            {"keyboard": {"bindings": ["start", {"keyCode": 49, "label": "Space"}]},
+             "controller": {"sources": []}}
+            """#.utf8)
+        let profile = try #require(InputProfile.decode(old))
+        #expect(profile.keyboard.bindings[.start] == KeyBinding(key: .space, label: "Space"))
+        let hotkeys = try JSONDecoder().decode(HotkeyMapping.self,
+                                               from: Data(#"{"bindings": ["menu", {"keyCode": 12, "label": "Q"}]}"#.utf8))
+        #expect(hotkeys.action(for: .keyQ) == .menu)
     }
 }
 

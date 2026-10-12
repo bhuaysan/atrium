@@ -145,7 +145,7 @@ final class InputRouter {
         controllers.map(\.name)
     }
 
-    @ObservationIgnored private var pressedKeys = Set<UInt16>()
+    @ObservationIgnored private var pressedKeys = Set<KeyboardKey>()
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var menuButtons: UInt32 = 0
     @ObservationIgnored private var libraryButtons: UInt32 = 0
@@ -209,16 +209,16 @@ final class InputRouter {
 
     /// Returns true when the key is bound to a RetroPad input.
     @discardableResult
-    func keyDown(_ keyCode: UInt16) -> Bool {
-        guard !profile.keyboard.input(forKeyCode: keyCode).isEmpty else { return false }
-        pressedKeys.insert(keyCode)
+    func keyDown(_ key: KeyboardKey) -> Bool {
+        guard !profile.keyboard.input(for: key).isEmpty else { return false }
+        pressedKeys.insert(key)
         push()
         return true
     }
 
     @discardableResult
-    func keyUp(_ keyCode: UInt16) -> Bool {
-        guard pressedKeys.remove(keyCode) != nil else { return false }
+    func keyUp(_ key: KeyboardKey) -> Bool {
+        guard pressedKeys.remove(key) != nil else { return false }
         push()
         return true
     }
@@ -434,7 +434,7 @@ final class InputRouter {
 
         // Keyboard → player 1
         for key in pressedKeys where includesKeyboard {
-            for input in profile.keyboard.input(forKeyCode: key) {
+            for input in profile.keyboard.input(for: key) {
                 if let button = input.button {
                     ports[0].set(button, true)
                 } else {

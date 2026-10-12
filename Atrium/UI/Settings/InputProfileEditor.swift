@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import AppKit
+import AtriumCore
 import SwiftUI
 
 /// Form sections that edit an `InputProfile`: the keyboard layout and the
@@ -123,7 +124,7 @@ struct InputProfileEditor: View {
     private var shadowedKeys: [String] {
         let hotkeys = session.input.hotkeys
         let labels = profile.keyboard.bindings.values
-            .filter { hotkeys.action(forKeyCode: $0.keyCode) != nil }
+            .filter { hotkeys.action(for: $0.key) != nil }
             .map(\.label)
         return Array(Set(labels)).sorted()
     }
@@ -142,14 +143,15 @@ struct InputProfileEditor: View {
         listening = .key(input)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             guard case .key(let target) = listening else { return event }
-            if event.type == .keyDown, event.keyCode == HotKey.escape {
+            guard let key = event.keyboardKey else { return nil }
+            if event.type == .keyDown, key == .escape {
                 stopListening()
                 return nil
             }
             if event.type == .flagsChanged, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty {
                 return nil // modifier released
             }
-            profile.keyboard.bindings[target] = KeyBinding(keyCode: event.keyCode, label: KeyLabel.label(for: event))
+            profile.keyboard.bindings[target] = KeyBinding(key: key, label: KeyLabel.label(for: event))
             stopListening()
             return nil
         }
@@ -178,17 +180,17 @@ extension RetroInput {
 
 /// Names for keys as the Controls settings show them.
 enum KeyLabel {
-    private static let specialKeys: [UInt16: String] = [
-        36: "↩", 48: "⇥", 49: "Space", 51: "⌫", 53: "esc", 117: "⌦",
-        123: "←", 124: "→", 125: "↓", 126: "↑",
-        56: "⇧ left", 60: "⇧ right", 59: "⌃ left", 62: "⌃ right", 58: "⌥ left", 61: "⌥ right",
-        55: "⌘ left", 54: "⌘ right", 57: "⇪",
-        122: "F1", 120: "F2", 99: "F3", 118: "F4", 96: "F5", 97: "F6", 98: "F7", 100: "F8",
-        101: "F9", 109: "F10", 103: "F11", 111: "F12",
+    private static let specialKeys: [KeyboardKey: String] = [
+        .enter: "↩", .tab: "⇥", .space: "Space", .backspace: "⌫", .escape: "esc", .delete: "⌦",
+        .arrowLeft: "←", .arrowRight: "→", .arrowDown: "↓", .arrowUp: "↑",
+        .shiftLeft: "⇧ left", .shiftRight: "⇧ right", .controlLeft: "⌃ left", .controlRight: "⌃ right",
+        .altLeft: "⌥ left", .altRight: "⌥ right", .metaLeft: "⌘ left", .metaRight: "⌘ right", .capsLock: "⇪",
+        .f1: "F1", .f2: "F2", .f3: "F3", .f4: "F4", .f5: "F5", .f6: "F6", .f7: "F7", .f8: "F8",
+        .f9: "F9", .f10: "F10", .f11: "F11", .f12: "F12",
     ]
 
     static func label(for event: NSEvent) -> String {
-        if let special = specialKeys[event.keyCode] { return special }
+        if let special = event.keyboardKey.flatMap({ specialKeys[$0] }) { return special }
         if event.type == .keyDown, let characters = event.charactersIgnoringModifiers, !characters.isEmpty {
             return characters.uppercased()
         }

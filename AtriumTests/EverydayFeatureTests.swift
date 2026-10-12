@@ -318,11 +318,11 @@ struct ControlsTests {
 
     @Test func escAlwaysOpensTheMenu() {
         var hotkeys = HotkeyMapping.standard
-        hotkeys.bindings[.menu] = KeyBinding(keyCode: 12, label: "Q")
-        #expect(hotkeys.action(forKeyCode: 12) == .menu)
-        #expect(hotkeys.action(forKeyCode: HotKey.escape) == .menu)
-        #expect(hotkeys.action(forKeyCode: HotKey.quickSave) == .quickSave)
-        #expect(hotkeys.action(forKeyCode: 0) == nil)
+        hotkeys.bindings[.menu] = KeyBinding(key: .keyQ, label: "Q")
+        #expect(hotkeys.action(for: .keyQ) == .menu)
+        #expect(hotkeys.action(for: .escape) == .menu)
+        #expect(hotkeys.action(for: .f2) == .quickSave)
+        #expect(hotkeys.action(for: .keyA) == nil)
     }
 
     @Test func deadZoneIsRadial() {
@@ -335,7 +335,7 @@ struct ControlsTests {
 
     @Test func aGamesOwnProfileWins() throws {
         var own = InputProfile.standard
-        own.keyboard.bindings[.a] = KeyBinding(keyCode: 0, label: "A")
+        own.keyboard.bindings[.a] = KeyBinding(key: .keyA, label: "A")
         let data = try #require(own.encoded)
         #expect(InputProfile.resolved(gameProfile: data, systemID: "snes") == own)
     }
